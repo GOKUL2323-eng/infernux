@@ -19,12 +19,11 @@ export async function connectDatabase(): Promise<void> {
     });
 
     await mongoose.connect(config.mongoUri, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 3000,
       autoIndex: config.env !== 'production',
     });
   } catch (error) {
-    logger.error('Failed to connect to MongoDB initially', 'Database', error);
-    // In local dev without local mongo running, we warn rather than crashing immediately so tests/mocks can function
+    logger.warn('Could not connect to MongoDB initially. Server running in offline/dev mode.', 'Database');
     if (config.env === 'production') {
       process.exit(1);
     }
@@ -39,4 +38,3 @@ export async function disconnectDatabase(): Promise<void> {
     logger.error('Error during MongoDB disconnect', 'Database', error);
   }
 }
-
