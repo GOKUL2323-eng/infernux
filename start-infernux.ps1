@@ -5,3 +5,4 @@ Write-Host "          INFERNUX LAUNCHER BOT                     " -ForegroundCol
 Write-Host "====================================================" -ForegroundColor Red
 Write-Host "Starting Infernux backend and mobile web app..." -ForegroundColor Cyan
 node scripts/launcher-bot.js
+

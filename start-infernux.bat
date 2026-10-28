@@ -10,3 +10,4 @@ echo Starting Infernux backend and mobile web app...
 echo.
 node scripts/launcher-bot.js
 pause
+
