@@ -22,3 +22,4 @@ export const useThemeStore = create<ThemeState>((set) => ({
       colors: isDark ? darkColors : lightColors,
     }),
 }));
+

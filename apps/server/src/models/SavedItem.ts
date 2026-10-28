@@ -36,3 +36,4 @@ SavedItemSchema.index({ userId: 1, itemType: 1, itemId: 1 }, { unique: true });
 SavedItemSchema.index({ userId: 1, createdAt: -1 });
 
 export const SavedItem = mongoose.model<ISavedItemDocument>('SavedItem', SavedItemSchema);
+

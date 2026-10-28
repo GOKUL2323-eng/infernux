@@ -64,3 +64,4 @@ PostSchema.index({ createdAt: -1 });
 PostSchema.index({ authorId: 1, createdAt: -1 });
 
 export const Post = mongoose.model<IPostDocument>('Post', PostSchema);
+

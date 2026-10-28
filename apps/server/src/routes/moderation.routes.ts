@@ -13,3 +13,4 @@ router.post('/reports', validateBody(createReportSchema), (req, res, next) =>
 );
 
 export default router;
+

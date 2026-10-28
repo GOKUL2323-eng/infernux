@@ -25,3 +25,4 @@ router.post('/:id/end', validateBody(endCallSchema), (req, res, next) =>
 router.get('/history', (req, res, next) => callController.getCallHistory(req, res, next));
 
 export default router;
+

@@ -62,3 +62,4 @@ const ReportSchema = new Schema<IReportDocument>(
 ReportSchema.index({ targetType: 1, targetId: 1 });
 
 export const Report = mongoose.model<IReportDocument>('Report', ReportSchema);
+

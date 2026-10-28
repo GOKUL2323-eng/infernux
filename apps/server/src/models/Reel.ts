@@ -64,3 +64,4 @@ ReelSchema.index({ createdAt: -1 });
 ReelSchema.index({ creatorId: 1, createdAt: -1 });
 
 export const Reel = mongoose.model<IReelDocument>('Reel', ReelSchema);
+

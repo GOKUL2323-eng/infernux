@@ -68,3 +68,4 @@ To verify real-time messaging, room keys, and voice/video calling across physica
 3. Switch to Device B: verify User A's private note is **not** visible anywhere on Device B.
 4. On Device A, go to Create -> **Social Note** -> type a status with a fire emoji and share.
 5. On Device B, open Social Notes: the 24-hour ephemeral status is visible to followers with like and reply options.
+

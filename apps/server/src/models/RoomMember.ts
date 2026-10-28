@@ -46,3 +46,4 @@ const RoomMemberSchema = new Schema<IRoomMemberDocument>(
 RoomMemberSchema.index({ roomId: 1, userId: 1 }, { unique: true });
 
 export const RoomMember = mongoose.model<IRoomMemberDocument>('RoomMember', RoomMemberSchema);
+

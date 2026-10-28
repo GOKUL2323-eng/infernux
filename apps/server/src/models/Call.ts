@@ -95,3 +95,4 @@ CallSchema.index({ initiatorId: 1, startedAt: -1 });
 CallSchema.index({ recipientId: 1, startedAt: -1 });
 
 export const Call = mongoose.model<ICallDocument>('Call', CallSchema);
+

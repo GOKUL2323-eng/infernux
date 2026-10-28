@@ -23,3 +23,4 @@ router.get('/user/:userId', optionalAuthenticate, (req, res, next) =>
 );
 
 export default router;
+

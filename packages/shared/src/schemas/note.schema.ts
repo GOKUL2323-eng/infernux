@@ -22,3 +22,4 @@ export const createSocialNoteSchema = z.object({
 export type CreatePrivateNoteInput = z.infer<typeof createPrivateNoteSchema>;
 export type UpdatePrivateNoteInput = z.infer<typeof updatePrivateNoteSchema>;
 export type CreateSocialNoteInput = z.infer<typeof createSocialNoteSchema>;
+

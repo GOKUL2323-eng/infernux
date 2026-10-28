@@ -16,3 +16,4 @@ export const addCommentSchema = z.object({
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type AddCommentInput = z.infer<typeof addCommentSchema>;
+

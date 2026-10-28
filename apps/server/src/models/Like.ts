@@ -35,3 +35,4 @@ const LikeSchema = new Schema<ILikeDocument>(
 LikeSchema.index({ userId: 1, targetType: 1, targetId: 1 }, { unique: true });
 
 export const Like = mongoose.model<ILikeDocument>('Like', LikeSchema);
+

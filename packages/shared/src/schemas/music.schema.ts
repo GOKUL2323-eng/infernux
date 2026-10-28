@@ -14,3 +14,4 @@ export const addTrackToPlaylistSchema = z.object({
 
 export type CreatePlaylistInput = z.infer<typeof createPlaylistSchema>;
 export type AddTrackToPlaylistInput = z.infer<typeof addTrackToPlaylistSchema>;
+

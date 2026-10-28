@@ -20,3 +20,4 @@ router.post('/playlists/:id/tracks', validateBody(addTrackToPlaylistSchema), (re
 );
 
 export default router;
+

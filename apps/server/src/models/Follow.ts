@@ -37,3 +37,4 @@ const FollowSchema = new Schema<IFollowDocument>(
 FollowSchema.index({ followerId: 1, followingId: 1 }, { unique: true });
 
 export const Follow = mongoose.model<IFollowDocument>('Follow', FollowSchema);
+

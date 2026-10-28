@@ -62,3 +62,4 @@ const ConversationSchema = new Schema<IConversationDocument>(
 ConversationSchema.index({ participants: 1, updatedAt: -1 });
 
 export const Conversation = mongoose.model<IConversationDocument>('Conversation', ConversationSchema);
+

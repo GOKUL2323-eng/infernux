@@ -43,3 +43,4 @@ export const uploadMiddleware = multer({
     fileSize: APP_LIMITS.MAX_VIDEO_SIZE_BYTES, // max 50MB
   },
 });
+

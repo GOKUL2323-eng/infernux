@@ -102,3 +102,4 @@ const styles = StyleSheet.create({
     right: -4,
   },
 });
+

@@ -38,3 +38,4 @@ const PlaylistSchema = new Schema<IPlaylistDocument>(
 PlaylistSchema.index({ creatorId: 1, updatedAt: -1 });
 
 export const Playlist = mongoose.model<IPlaylistDocument>('Playlist', PlaylistSchema);
+

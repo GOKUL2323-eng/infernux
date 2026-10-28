@@ -131,3 +131,4 @@ The mobile application specifies all required iOS InfoPlist keys and Android per
 - `NSMicrophoneUsageDescription`: Microphone access for voice notes and calls.
 - `NSPhotoLibraryUsageDescription`: Photo selection from library.
 - Android Permissions: `CAMERA`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `POST_NOTIFICATIONS`.
+

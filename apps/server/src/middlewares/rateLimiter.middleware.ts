@@ -20,3 +20,4 @@ export const authLimiter = rateLimit({
     sendError(res, 'Too many authentication attempts, please try again in 15 minutes', 429, 'AUTH_RATE_LIMIT_EXCEEDED');
   },
 });
+

@@ -60,3 +60,4 @@ const StorySchema = new Schema<IStoryDocument>(
 StorySchema.index({ creatorId: 1, isExpired: 1, expiresAt: 1 });
 
 export const Story = mongoose.model<IStoryDocument>('Story', StorySchema);
+

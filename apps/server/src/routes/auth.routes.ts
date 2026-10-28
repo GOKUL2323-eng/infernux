@@ -25,3 +25,4 @@ router.get('/me', authenticate, (req, res, next) => authController.getMe(req, re
 router.delete('/account', authenticate, (req, res, next) => authController.deleteAccount(req, res, next));
 
 export default router;
+

@@ -33,3 +33,4 @@ const MusicTrackSchema = new Schema<IMusicTrackDocument>(
 MusicTrackSchema.index({ title: 'text', artist: 'text', album: 'text' });
 
 export const MusicTrack = mongoose.model<IMusicTrackDocument>('MusicTrack', MusicTrackSchema);
+

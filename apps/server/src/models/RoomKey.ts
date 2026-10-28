@@ -64,3 +64,4 @@ const RoomKeySchema = new Schema<IRoomKeyDocument>(
 );
 
 export const RoomKey = mongoose.model<IRoomKeyDocument>('RoomKey', RoomKeySchema);
+

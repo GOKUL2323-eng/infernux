@@ -39,3 +39,4 @@ const PrivateNoteSchema = new Schema<IPrivateNoteDocument>(
 PrivateNoteSchema.index({ userId: 1, isArchived: 1, isPinned: -1, updatedAt: -1 });
 
 export const PrivateNote = mongoose.model<IPrivateNoteDocument>('PrivateNote', PrivateNoteSchema);
+

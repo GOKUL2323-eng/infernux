@@ -15,3 +15,4 @@ export const replyToStorySchema = z.object({
 
 export type CreateStoryInput = z.infer<typeof createStorySchema>;
 export type ReplyToStoryInput = z.infer<typeof replyToStorySchema>;
+

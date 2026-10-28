@@ -13,3 +13,4 @@ export const blockUserSchema = z.object({
 
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type BlockUserInput = z.infer<typeof blockUserSchema>;
+

@@ -37,3 +37,4 @@ export function hashToken(token: string): string {
 export function isValidRoomKeyFormat(key: string): boolean {
   return /^IFNX-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/i.test(key.trim());
 }
+

@@ -53,3 +53,4 @@ This guide covers common issues and resolutions during development, testing, and
   - Video and Reels: maximum 50MB (max 90 seconds).
   - Audio and Voice messages: maximum 15MB.
   - Documents: maximum 25MB.
+

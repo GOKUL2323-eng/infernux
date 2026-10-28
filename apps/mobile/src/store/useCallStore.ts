@@ -133,3 +133,4 @@ export const useCallStore = create<CallState>((set, get) => ({
   toggleCameraFacing: () => set((state) => ({ isFrontCamera: !state.isFrontCamera })),
   incrementDuration: () => set((state) => ({ callDuration: state.callDuration + 1 })),
 }));
+

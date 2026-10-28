@@ -21,3 +21,4 @@ router.post('/:id/save', (req, res, next) => postController.toggleSavePost(req, 
 router.get('/user/:userId', (req, res, next) => postController.getUserPosts(req, res, next));
 
 export default router;
+

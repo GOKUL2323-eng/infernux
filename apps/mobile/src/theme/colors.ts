@@ -93,3 +93,4 @@ export const lightColors: ThemeColors = {
   gradientDark: ['#FFFFFF', '#F8F9FD'],
   glassOverlay: 'rgba(0, 0, 0, 0.03)',
 };
+

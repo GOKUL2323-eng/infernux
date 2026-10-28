@@ -34,3 +34,4 @@ router.post('/:id/leave', (req, res, next) => roomController.leaveRoom(req, res,
 router.delete('/:id', (req, res, next) => roomController.deleteRoom(req, res, next));
 
 export default router;
+

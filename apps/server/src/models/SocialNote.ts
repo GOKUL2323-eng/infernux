@@ -52,3 +52,4 @@ const SocialNoteSchema = new Schema<ISocialNoteDocument>(
 SocialNoteSchema.index({ authorId: 1, isExpired: 1, expiresAt: 1 });
 
 export const SocialNote = mongoose.model<ISocialNoteDocument>('SocialNote', SocialNoteSchema);
+

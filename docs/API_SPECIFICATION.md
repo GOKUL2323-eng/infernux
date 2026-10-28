@@ -194,3 +194,4 @@ Returns recent incoming and outgoing voice/video call history.
 | `call:accepted` | Server -> Client | `{ callerId, callId }` |
 | `call:rejected` | Server -> Client | `{ callerId, callId, reason }` |
 | `call:ended` | Server -> Client | `{ targetUserId, callId }` |
+

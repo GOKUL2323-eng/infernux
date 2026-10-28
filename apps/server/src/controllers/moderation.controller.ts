@@ -15,3 +15,4 @@ export class ModerationController {
 }
 
 export const moderationController = new ModerationController();
+

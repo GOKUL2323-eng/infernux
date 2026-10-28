@@ -37,3 +37,4 @@ const ReelCommentSchema = new Schema<IReelCommentDocument>(
 ReelCommentSchema.index({ reelId: 1, createdAt: -1 });
 
 export const ReelComment = mongoose.model<IReelCommentDocument>('ReelComment', ReelCommentSchema);
+

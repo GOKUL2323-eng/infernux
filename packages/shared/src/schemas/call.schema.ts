@@ -18,3 +18,4 @@ export const endCallSchema = z.object({
 export type InitiateCallInput = z.infer<typeof initiateCallSchema>;
 export type RespondCallInput = z.infer<typeof respondCallSchema>;
 export type EndCallInput = z.infer<typeof endCallSchema>;
+

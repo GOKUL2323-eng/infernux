@@ -43,3 +43,4 @@ const CommentSchema = new Schema<ICommentDocument>(
 CommentSchema.index({ postId: 1, createdAt: -1 });
 
 export const Comment = mongoose.model<ICommentDocument>('Comment', CommentSchema);
+

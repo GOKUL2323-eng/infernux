@@ -52,3 +52,4 @@ export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type EditMessageInput = z.infer<typeof editMessageSchema>;
 export type AddReactionInput = z.infer<typeof addReactionSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+

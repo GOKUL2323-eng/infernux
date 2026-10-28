@@ -151,3 +151,4 @@ UserSchema.methods.toProfileJSON = function (): UserProfile {
 };
 
 export const User = mongoose.model<IUserDocument>('User', UserSchema);
+

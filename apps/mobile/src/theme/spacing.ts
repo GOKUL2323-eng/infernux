@@ -26,3 +26,4 @@ export const typography = {
   caption: { fontSize: 12, fontWeight: '400' as const, lineHeight: 16 },
   button: { fontSize: 15, fontWeight: '600' as const, letterSpacing: 0.2 },
 };
+

@@ -102,3 +102,4 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     set({ sound: null, isPlaying: false, isMiniPlayerVisible: false, currentTrack: null });
   },
 }));
+

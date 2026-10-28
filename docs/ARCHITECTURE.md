@@ -87,3 +87,4 @@ Infernux treats room identifiers and room keys as two distinct architectural ent
 - Configurable media storage driver: Cloudinary / S3 / Local Disk with static streaming.
 - File validation: Format verification and strict size boundaries (Images: 10MB, Videos/Reels: 50MB, Audio Voice Notes: 15MB).
 - Progressive video preloading and viewport-based playback cleanup for mid-range Android and iOS devices.
+

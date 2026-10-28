@@ -43,3 +43,4 @@ describe('API Server Integration Tests', () => {
     expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 });
+

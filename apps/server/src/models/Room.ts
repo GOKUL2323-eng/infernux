@@ -59,3 +59,4 @@ const RoomSchema = new Schema<IRoomDocument>(
 );
 
 export const Room = mongoose.model<IRoomDocument>('Room', RoomSchema);
+

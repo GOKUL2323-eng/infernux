@@ -17,3 +17,4 @@ router.get('/:id/viewers', (req, res, next) => storyController.getViewers(req, r
 router.delete('/:id', (req, res, next) => storyController.deleteStory(req, res, next));
 
 export default router;
+

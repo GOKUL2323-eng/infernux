@@ -56,3 +56,4 @@ bootstrap().catch((error) => {
   logger.error('Fatal error during server bootstrap', 'Bootstrap', error);
   process.exit(1);
 });
+

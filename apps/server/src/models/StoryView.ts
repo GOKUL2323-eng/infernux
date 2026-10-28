@@ -33,3 +33,4 @@ const StoryViewSchema = new Schema<IStoryViewDocument>(
 StoryViewSchema.index({ storyId: 1, viewerId: 1 }, { unique: true });
 
 export const StoryView = mongoose.model<IStoryViewDocument>('StoryView', StoryViewSchema);
+
