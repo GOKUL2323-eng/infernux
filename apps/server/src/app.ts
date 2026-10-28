@@ -20,7 +20,7 @@ export function createApp(): Application {
   // CORS
   app.use(
     cors({
-      origin: '*', // Allow mobile apps and web clients
+      origin: true, // Dynamically reflect origin so credentialed requests from browser never fail CORS
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],

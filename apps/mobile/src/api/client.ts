@@ -20,7 +20,10 @@ let inMemoryTokens: { access?: string; refresh?: string } = {};
 export async function setAuthTokens(accessToken: string, refreshToken: string): Promise<void> {
   inMemoryTokens = { access: accessToken, refresh: refreshToken };
   try {
-    if (Platform.OS !== 'web') {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    } else if (Platform.OS !== 'web') {
       await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     }
@@ -32,7 +35,11 @@ export async function setAuthTokens(accessToken: string, refreshToken: string): 
 export async function getAccessToken(): Promise<string | null> {
   if (inMemoryTokens.access) return inMemoryTokens.access;
   try {
-    if (Platform.OS !== 'web') {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const token = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (token) inMemoryTokens.access = token;
+      return token;
+    } else if (Platform.OS !== 'web') {
       const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
       if (token) inMemoryTokens.access = token;
       return token;
@@ -46,7 +53,11 @@ export async function getAccessToken(): Promise<string | null> {
 export async function getRefreshToken(): Promise<string | null> {
   if (inMemoryTokens.refresh) return inMemoryTokens.refresh;
   try {
-    if (Platform.OS !== 'web') {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const token = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (token) inMemoryTokens.refresh = token;
+      return token;
+    } else if (Platform.OS !== 'web') {
       const token = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
       if (token) inMemoryTokens.refresh = token;
       return token;
@@ -60,7 +71,10 @@ export async function getRefreshToken(): Promise<string | null> {
 export async function clearAuthTokens(): Promise<void> {
   inMemoryTokens = {};
   try {
-    if (Platform.OS !== 'web') {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    } else if (Platform.OS !== 'web') {
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }

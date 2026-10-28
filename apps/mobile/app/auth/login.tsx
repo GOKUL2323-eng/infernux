@@ -38,7 +38,7 @@ export default function LoginScreen() {
     });
 
     if (success) {
-      router.replace('/(tabs)' as any);
+      router.replace('/' as any);
     }
   };
 
