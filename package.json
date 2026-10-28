@@ -1,8 +1,8 @@
 {
-  "name": "infernux-monorepo",
+  "name": "mozhi-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Infernux - All-in-One Social Messaging and Media Mobile Application",
+  "description": "MOZHI - All-in-One Social Messaging and Media Mobile Application",
   "workspaces": [
     "packages/*",
     "apps/*"

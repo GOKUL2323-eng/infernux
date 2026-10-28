@@ -20,6 +20,21 @@ export default function RootLayout() {
 
   useEffect(() => {
     restoreSession();
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.title = 'MOZHI';
+      try {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'shortcut icon';
+          document.head.appendChild(link);
+        }
+        link.type = 'image/png';
+        link.href = '/assets/favicon.png';
+      } catch {
+        // ignore
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -46,7 +61,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack screenOptions={{ title: 'MOZHI', headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           <Stack.Screen name="auth/register" options={{ headerShown: false }} />
