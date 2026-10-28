@@ -31,7 +31,7 @@ export const RoomKeyBadge: React.FC<RoomKeyBadgeProps> = ({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join my private room "${roomName}" on Infernux! Use room key: ${keyInfo.secretKey} or join here: ${keyInfo.inviteUrl}`,
+        message: `Join my private room "${roomName}" on MOZHI! Use room key: ${keyInfo.secretKey} or join here: ${keyInfo.inviteUrl}`,
         url: keyInfo.inviteUrl,
       });
     } catch {

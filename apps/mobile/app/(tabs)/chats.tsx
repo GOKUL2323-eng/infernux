@@ -122,7 +122,7 @@ export default function ChatsScreen() {
         <Avatar url={otherUser?.avatarUrl} name={otherUser?.displayName || 'User'} size={48} />
         <View style={styles.chatInfo}>
           <Text style={[typography.body1, { color: colors.text, fontWeight: '600' }]}>
-            {otherUser?.displayName || otherUser?.username || 'Infernux User'}
+            {otherUser?.displayName || otherUser?.username || 'MOZHI User'}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
             <Ionicons

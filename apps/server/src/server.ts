@@ -31,7 +31,7 @@ async function bootstrap() {
   // Start listening
   server.listen(config.port, config.host, () => {
     logger.info(
-      `Infernux API & Realtime Server running on http://${config.host}:${config.port} [env: ${config.env}]`,
+      `MOZHI API & Realtime Server running on http://${config.host}:${config.port} [env: ${config.env}]`,
       'Bootstrap'
     );
   });

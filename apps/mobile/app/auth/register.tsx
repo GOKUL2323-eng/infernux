@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,10 +60,14 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
-          <Ionicons name="flame" size={40} color={colors.primary} />
-          <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.brandLogo}
+            resizeMode="cover"
+          />
+          <Text style={[styles.title, { color: colors.text }]}>Join MOZHI</Text>
           <Text style={[typography.body2, { color: colors.textSecondary, marginTop: spacing.xxs }]}>
-            Join the next-generation social network
+            All-in-One Social Messaging & Media
           </Text>
         </View>
 
@@ -147,6 +152,12 @@ const styles = StyleSheet.create({
   brandHeader: {
     alignItems: 'center',
     marginBottom: spacing.lg,
+  },
+  brandLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    marginBottom: spacing.xs,
   },
   title: {
     fontSize: 26,

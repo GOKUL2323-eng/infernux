@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,10 +50,12 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.brandHeader}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons name="flame" size={48} color={colors.primary} />
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>INFERNUX</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.brandLogo}
+            resizeMode="cover"
+          />
+          <Text style={[styles.title, { color: colors.text }]}>MOZHI</Text>
           <Text style={[typography.body2, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>
             All-in-One Social Messaging & Media
           </Text>
@@ -122,12 +125,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  brandLogo: {
+    width: 90,
+    height: 90,
+    borderRadius: 24,
     marginBottom: spacing.md,
   },
   title: {

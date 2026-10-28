@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Infernux",
-    "slug": "infernux",
+    "name": "MOZHI",
+    "slug": "mozhi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "infernux",
+    "scheme": "mozhi",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
@@ -14,12 +14,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.infernux.app",
+      "bundleIdentifier": "com.mozhi.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Infernux needs camera access to capture photos and videos for posts, stories, reels, and video calls.",
-        "NSMicrophoneUsageDescription": "Infernux needs microphone access for voice notes, audio posts, and voice/video calling.",
-        "NSPhotoLibraryUsageDescription": "Infernux needs photo library access so you can select and share media.",
-        "NSPhotoLibraryAddUsageDescription": "Infernux needs permission to save photos and videos to your library."
+        "NSCameraUsageDescription": "MOZHI needs camera access to capture photos and videos for posts, stories, reels, and video calls.",
+        "NSMicrophoneUsageDescription": "MOZHI needs microphone access for voice notes, audio posts, and voice/video calling.",
+        "NSPhotoLibraryUsageDescription": "MOZHI needs photo library access so you can select and share media.",
+        "NSPhotoLibraryAddUsageDescription": "MOZHI needs permission to save photos and videos to your library."
       }
     },
     "android": {
@@ -27,7 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0D12"
       },
-      "package": "com.infernux.app",
+      "package": "com.mozhi.app",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -47,14 +47,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Infernux to access your camera"
+          "cameraPermission": "Allow MOZHI to access your camera"
         }
       ],
       [
-        "expo-notifications",
+        "expo-media-library",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#FF416C"
+          "photosPermission": "Allow MOZHI to access your photos",
+          "savePhotosPermission": "Allow MOZHI to save photos"
         }
       ]
     ],
@@ -63,4 +63,3 @@
     }
   }
 }
-

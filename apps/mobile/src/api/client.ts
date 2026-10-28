@@ -132,7 +132,7 @@ async function request<T>(
       success: false,
       error: {
         code: 'NETWORK_ERROR',
-        message: error.message || 'Unable to connect to Infernux servers',
+        message: error.message || 'Unable to connect to MOZHI servers',
       },
     };
   }

@@ -32,7 +32,7 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out of Infernux?', [
+    Alert.alert('Sign Out', 'Are you sure you want to sign out of MOZHI?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',

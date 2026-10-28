@@ -29,7 +29,7 @@ class SocketClient {
     });
 
     this.socket.on('connect', () => {
-      console.log('[Socket] Connected to Infernux Realtime Engine');
+      console.log('[Socket] Connected to MOZHI Realtime Engine');
     });
 
     this.socket.on('connect_error', (err) => {

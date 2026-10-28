@@ -81,10 +81,10 @@ export default function CallScreen() {
             isVerified={otherParty?.isVerified}
           />
           <Text style={[typography.h2, styles.callerName]}>
-            {otherParty?.displayName || otherParty?.username || 'Infernux Caller'}
+            {otherParty?.displayName || otherParty?.username || 'MOZHI Caller'}
           </Text>
           <Text style={[typography.body2, styles.callSubtitle]}>
-            Infernux HD WebRTC {activeCall?.callType === 'video' ? 'Video' : 'Voice'} Call
+            MOZHI HD WebRTC {activeCall?.callType === 'video' ? 'Video' : 'Voice'} Call
           </Text>
         </View>
       </View>

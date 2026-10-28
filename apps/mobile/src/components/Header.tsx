@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '../store/useThemeStore';
@@ -24,9 +24,13 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
       <View style={styles.brandRow}>
-        <Ionicons name="flame" size={26} color={colors.primary} />
+        <Image
+          source={require('../../assets/logo.png')}
+          style={styles.logoImage}
+          resizeMode="cover"
+        />
         <Text style={[styles.brandText, { color: colors.text }]}>
-          {title || 'INFERNUX'}
+          {title || 'MOZHI'}
         </Text>
       </View>
 
@@ -57,30 +61,34 @@ export const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: 54,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    borderBottomWidth: 0.5,
+    borderBottomWidth: 1,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  logoImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    marginRight: spacing.sm,
+  },
   brandText: {
-    fontSize: 20,
+    ...typography.h3,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginLeft: spacing.xs,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionBtn: {
-    marginLeft: spacing.md,
     padding: spacing.xs,
+    marginLeft: spacing.sm,
   },
 });
-
