@@ -1,8 +1,20 @@
 import { Response, NextFunction } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { config } from '../config/env';
 import { sendSuccess } from '../utils/response';
 import { MediaAttachment } from '@infernux/shared';
+import { logger } from '../utils/logger';
+
+// Configure Cloudinary if credentials are provided
+if (config.storage.cloudinary.cloudName && config.storage.cloudinary.apiKey && config.storage.cloudinary.apiSecret) {
+  cloudinary.config({
+    cloud_name: config.storage.cloudinary.cloudName,
+    api_key: config.storage.cloudinary.apiKey,
+    api_secret: config.storage.cloudinary.apiSecret,
+  });
+  logger.info('Cloudinary SDK configured for media storage', 'Media');
+}
 
 export class MediaController {
   async uploadFile(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
@@ -22,7 +34,33 @@ export class MediaController {
         mediaType = 'audio';
       }
 
-      const fileUrl = `${config.apiUrl}/uploads/${file.filename}`;
+      let fileUrl = `${config.apiUrl}/uploads/${file.filename}`;
+      let thumbnailUrl: string | undefined = mediaType === 'image' ? fileUrl : undefined;
+
+      // Upload to Cloudinary if enabled
+      if (
+        config.storage.provider === 'cloudinary' &&
+        config.storage.cloudinary.cloudName &&
+        config.storage.cloudinary.apiKey
+      ) {
+        try {
+          const uploadRes = await cloudinary.uploader.upload(file.path, {
+            resource_type: mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'raw' : 'image',
+            folder: 'infernux',
+          });
+
+          fileUrl = uploadRes.secure_url;
+          if (mediaType === 'image') {
+            thumbnailUrl = cloudinary.url(uploadRes.public_id, {
+              width: 300,
+              height: 300,
+              crop: 'fill',
+            });
+          }
+        } catch (cloudErr) {
+          logger.warn('Cloudinary upload failed, falling back to local file URL', 'Media', cloudErr);
+        }
+      }
 
       const attachment: MediaAttachment = {
         url: fileUrl,
@@ -30,7 +68,7 @@ export class MediaController {
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
-        thumbnailUrl: mediaType === 'image' ? fileUrl : undefined,
+        thumbnailUrl,
       };
 
       sendSuccess(res, attachment, 'Media uploaded successfully', 201);
@@ -41,4 +79,3 @@ export class MediaController {
 }
 
 export const mediaController = new MediaController();
-

@@ -1,6 +1,14 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { config } from './env';
 import { logger } from '../utils/logger';
+
+// Ensure Windows Node.js can resolve MongoDB Atlas SRV records
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {
+  // ignore if custom DNS cannot be bound
+}
 
 let memoryServerInstance: any = null;
 
