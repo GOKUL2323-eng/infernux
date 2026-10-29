@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity, Platform } from 'react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useThemeStore } from '../src/store/useThemeStore';
 import { useCallStore } from '../src/store/useCallStore';
