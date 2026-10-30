@@ -14,7 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Audio } from 'expo-av';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  AudioModule,
+  requestRecordingPermissionsAsync,
+} from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,8 +53,8 @@ export default function ChatScreen() {
   const { initiateCall } = useCallStore();
 
   const [inputText, setInputText] = useState('');
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<MessageSummary | null>(null);
   const [replyingTo, setReplyingTo] = useState<MessageSummary | null>(null);
@@ -115,21 +120,23 @@ export default function ChatScreen() {
 
   const startVoiceRecording = async () => {
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('Permission needed', 'Audio recording permission is required');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      try {
+        await AudioModule.setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
+      } catch {
+        // ignore
+      }
 
-      const newRecording = new Audio.Recording();
-      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await newRecording.startAsync();
-      setRecording(newRecording);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
     } catch (err) {
       console.warn('Failed to start recording', err);
@@ -137,16 +144,13 @@ export default function ChatScreen() {
   };
 
   const stopVoiceRecording = async () => {
-    if (!recording) return;
+    if (!isRecording) return;
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      const status = await recording.getStatusAsync();
+      await recorder.stop();
       setIsRecording(false);
-      setRecording(null);
+      const uri = recorder.uri;
 
       if (uri) {
-        const durationSec = Math.round(status.durationMillis / 1000);
         setIsUploading(true);
         const uploadedUrl = await uploadMediaAsset({
           uri,
@@ -157,13 +161,12 @@ export default function ChatScreen() {
         setIsUploading(false);
 
         await sendMessage(conversationId, 'Voice Note', 'audio', [
-          { url: uploadedUrl, type: 'audio', duration: durationSec },
+          { url: uploadedUrl, type: 'audio', duration: 10 },
         ]);
       }
     } catch (err) {
       console.warn('Failed to stop recording', err);
       setIsRecording(false);
-      setRecording(null);
       setIsUploading(false);
     }
   };

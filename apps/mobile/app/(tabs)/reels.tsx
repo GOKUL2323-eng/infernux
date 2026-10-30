@@ -7,13 +7,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  ViewToken,
   Share,
   Alert,
 } from 'react-native';
+
+interface ViewToken {
+  item: any;
+  key: string;
+  index: number | null;
+  isViewable: boolean;
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../src/store/useFeedStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
@@ -25,6 +31,59 @@ import { ReelSummary } from '@infernux/shared';
 
 const { width, height } = Dimensions.get('window');
 const REEL_HEIGHT = height - 110; // Minus tab bar height
+
+function ReelVideo({
+  videoUrl,
+  thumbnailUrl,
+  isActive,
+  paused,
+  isMuted,
+}: {
+  videoUrl: string;
+  thumbnailUrl?: string;
+  isActive: boolean;
+  paused: boolean;
+  isMuted: boolean;
+}) {
+  const player = useVideoPlayer(videoUrl, (p) => {
+    p.loop = true;
+    p.muted = isMuted;
+    if (isActive && !paused) {
+      p.play();
+    }
+  });
+
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
+  useEffect(() => {
+    if (isActive && !paused) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, paused, player]);
+
+  if (!isActive) {
+    return (
+      <Image
+        source={{ uri: thumbnailUrl || videoUrl }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+    );
+  }
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
 
 export default function ReelsScreen() {
   const router = useRouter();
@@ -38,7 +97,7 @@ export default function ReelsScreen() {
     loadReels();
   }, []);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
       setActiveReelIndex(viewableItems[0].index);
       setPaused(false);
@@ -99,24 +158,15 @@ export default function ReelsScreen() {
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setPaused(!paused)}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         >
-          {isActive ? (
-            <Video
-              source={{ uri: item.videoUrl }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              shouldPlay={!paused}
-              isMuted={isMuted}
-            />
-          ) : (
-            <Image
-              source={{ uri: item.thumbnailUrl }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
-          )}
+          <ReelVideo
+            videoUrl={item.videoUrl}
+            thumbnailUrl={item.thumbnailUrl}
+            isActive={isActive}
+            paused={paused}
+            isMuted={isMuted}
+          />
 
           {paused && (
             <View style={styles.pauseOverlay}>

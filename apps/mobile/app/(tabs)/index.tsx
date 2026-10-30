@@ -229,7 +229,7 @@ export default function HomeScreen() {
                 Follow friends or tap Create to share your first post!
               </Text>
             </View>
-          ) : null
+          ) : undefined
         }
       />
 

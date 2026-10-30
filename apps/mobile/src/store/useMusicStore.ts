@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer, AudioModule } from 'expo-audio';
 import { MusicTrack } from '@infernux/shared';
 
 interface MusicState {
@@ -8,7 +8,7 @@ interface MusicState {
   isMiniPlayerVisible: boolean;
   playlist: MusicTrack[];
   currentIndex: number;
-  sound: Audio.Sound | null;
+  player: AudioPlayer | null;
 
   playTrack: (track: MusicTrack, playlist?: MusicTrack[]) => Promise<void>;
   togglePlayPause: () => Promise<void>;
@@ -23,39 +23,45 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   isMiniPlayerVisible: false,
   playlist: [],
   currentIndex: 0,
-  sound: null,
+  player: null,
 
   playTrack: async (track: MusicTrack, playlist = []) => {
-    const { sound: existingSound } = get();
-    if (existingSound) {
-      await existingSound.unloadAsync();
+    const { player: existingPlayer } = get();
+    if (existingPlayer) {
+      try {
+        existingPlayer.remove();
+      } catch {
+        // ignore
+      }
     }
 
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
+      try {
+        await AudioModule.setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: 'duckOthers',
+        });
+      } catch {
+        // ignore
+      }
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: track.audioUrl },
-        { shouldPlay: true }
-      );
+      const newPlayer = createAudioPlayer(track.audioUrl);
+      newPlayer.play();
 
       const activePlaylist = playlist.length > 0 ? playlist : [track];
       const index = activePlaylist.findIndex((t) => t.id === track.id);
 
       set({
         currentTrack: track,
-        sound: newSound,
+        player: newPlayer,
         isPlaying: true,
         isMiniPlayerVisible: true,
         playlist: activePlaylist,
         currentIndex: Math.max(0, index),
       });
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
+      newPlayer.addListener('playbackStatusUpdate', (status) => {
+        if (status.didJustFinish) {
           get().nextTrack();
         }
       });
@@ -65,14 +71,14 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   togglePlayPause: async () => {
-    const { sound, isPlaying } = get();
-    if (!sound) return;
+    const { player, isPlaying } = get();
+    if (!player) return;
 
     if (isPlaying) {
-      await sound.pauseAsync();
+      player.pause();
       set({ isPlaying: false });
     } else {
-      await sound.playAsync();
+      player.play();
       set({ isPlaying: true });
     }
   },
@@ -94,12 +100,15 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   closeMiniPlayer: async () => {
-    const { sound } = get();
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
+    const { player } = get();
+    if (player) {
+      try {
+        player.pause();
+        player.remove();
+      } catch {
+        // ignore
+      }
     }
-    set({ sound: null, isPlaying: false, isMiniPlayerVisible: false, currentTrack: null });
+    set({ player: null, isPlaying: false, isMiniPlayerVisible: false, currentTrack: null });
   },
 }));
-

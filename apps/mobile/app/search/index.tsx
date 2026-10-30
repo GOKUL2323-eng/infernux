@@ -152,7 +152,7 @@ export default function SearchScreen() {
                 No Results Found
               </Text>
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </SafeAreaView>

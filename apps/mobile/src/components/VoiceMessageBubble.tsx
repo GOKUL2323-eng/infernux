@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/useThemeStore';
 import { spacing, borderRadius, typography } from '../theme/spacing';
@@ -17,45 +17,49 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
   isSender,
 }) => {
   const { colors } = useThemeStore();
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [positionMillis, setPositionMillis] = useState(0);
+  const [positionSeconds, setPositionSeconds] = useState(0);
 
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      if (player) {
+        try {
+          player.remove();
+        } catch {
+          // ignore
+        }
       }
     };
-  }, [sound]);
+  }, [player]);
 
-  const togglePlayback = async () => {
-    if (!sound) {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true }
-      );
-      setSound(newSound);
-      setIsPlaying(true);
+  const togglePlayback = () => {
+    try {
+      if (!player) {
+        const newPlayer = createAudioPlayer(audioUrl);
+        newPlayer.play();
+        setPlayer(newPlayer);
+        setIsPlaying(true);
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setPositionMillis(status.positionMillis);
-          setIsPlaying(status.isPlaying);
+        newPlayer.addListener('playbackStatusUpdate', (status) => {
+          setPositionSeconds(Math.round(status.currentTime || 0));
+          setIsPlaying(status.playing);
           if (status.didJustFinish) {
             setIsPlaying(false);
-            setPositionMillis(0);
+            setPositionSeconds(0);
           }
-        }
-      });
-    } else {
-      if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
+        });
       } else {
-        await sound.playAsync();
-        setIsPlaying(true);
+        if (isPlaying) {
+          player.pause();
+          setIsPlaying(false);
+        } else {
+          player.play();
+          setIsPlaying(true);
+        }
       }
+    } catch (err) {
+      console.warn('Voice message playback error:', err);
     }
   };
 
@@ -103,7 +107,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
           { color: isSender ? 'rgba(255,255,255,0.8)' : colors.textSecondary, marginLeft: spacing.xs },
         ]}
       >
-        {formatDuration(isPlaying ? positionMillis / 1000 : duration)}
+        {formatDuration(isPlaying ? positionSeconds : duration)}
       </Text>
     </View>
   );
@@ -136,4 +140,3 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
-

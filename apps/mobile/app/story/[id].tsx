@@ -139,7 +139,7 @@ export default function StoryViewerScreen() {
         onPressIn={() => setIsPaused(true)}
         onPressOut={() => setIsPaused(false)}
       >
-        <View style={StyleSheet.absoluteFillObject}>
+        <View style={StyleSheet.absoluteFill}>
           <Image source={{ uri: currentStory.mediaUrl }} style={styles.storyMedia} />
 
           {/* Left tap zone */}

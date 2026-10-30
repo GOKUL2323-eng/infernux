@@ -286,7 +286,7 @@ export default function CreateScreen() {
               ]}
             >
               {selectedMedia ? (
-                <View style={StyleSheet.absoluteFillObject}>
+                <View style={StyleSheet.absoluteFill}>
                   <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} />
                   <TouchableOpacity
                     onPress={() => setSelectedMedia(null)}

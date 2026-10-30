@@ -31,7 +31,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={String(color || colors.primary)} />
           ),
         }}
       />
@@ -40,7 +40,7 @@ export default function TabLayout() {
         options={{
           title: 'Reels',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'play-circle' : 'play-circle-outline'} size={26} color={color} />
+            <Ionicons name={focused ? 'play-circle' : 'play-circle-outline'} size={26} color={String(color || colors.primary)} />
           ),
         }}
       />
@@ -48,7 +48,7 @@ export default function TabLayout() {
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: () => (
             <Ionicons name="add-circle" size={30} color={colors.primary} />
           ),
         }}
@@ -58,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: 'Chats',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={String(color || colors.primary)} />
           ),
         }}
       />
@@ -67,7 +67,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={String(color || colors.primary)} />
           ),
         }}
       />
