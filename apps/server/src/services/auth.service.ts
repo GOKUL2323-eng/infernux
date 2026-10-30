@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { config } from '../config/env';
 import { User, IUserDocument } from '../models/User';
 import { Session } from '../models/Session';
 import { hashToken } from '../utils/crypto';
+import { smsService } from './sms.service';
 import {
   RegisterInput,
   LoginInput,
@@ -12,6 +14,11 @@ import {
   AuthResponse,
   UserProfile,
   ChangePasswordInput,
+  SendPhoneOtpInput,
+  VerifyPhoneOtpInput,
+  PhoneRegisterInput,
+  ChangePhoneInput,
+  SendPhoneOtpResponse,
 } from '@infernux/shared';
 
 export class AuthService {
@@ -168,6 +175,183 @@ export class AuthService {
   async deleteAccount(userId: string): Promise<void> {
     await Session.deleteMany({ userId });
     await User.findByIdAndDelete(userId);
+  }
+
+  async sendPhoneOtp(input: SendPhoneOtpInput): Promise<SendPhoneOtpResponse> {
+    const { e164 } = smsService.normalizePhoneNumber(input.phoneNumber, input.countryCode);
+
+    const existingUser = await User.findOne({
+      $or: [{ normalizedPhoneNumber: e164 }, { phoneNumber: e164 }],
+    });
+
+    if (input.purpose === 'register' && existingUser && existingUser.phoneVerified) {
+      throw new Error('This phone number is already registered to another account. Please sign in instead.');
+    }
+
+    const result = await smsService.sendOtp(input.phoneNumber, input.countryCode, input.purpose);
+    return {
+      ...result,
+      isRegistered: !!existingUser,
+    };
+  }
+
+  async loginWithPhone(
+    input: VerifyPhoneOtpInput,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<AuthResponse & { isNewUser?: boolean }> {
+    const { normalizedPhoneNumber } = await smsService.verifyOtp(
+      input.phoneNumber,
+      input.countryCode,
+      input.otp,
+      'login'
+    );
+
+    let user = await User.findOne({
+      $or: [{ normalizedPhoneNumber }, { phoneNumber: normalizedPhoneNumber }],
+    });
+
+    let isNewUser = false;
+
+    // If user does not exist with this phone number, auto-provision account
+    if (!user) {
+      isNewUser = true;
+      const cleanDigits = normalizedPhoneNumber.replace(/\D/g, '');
+      const uniqueSuffix = cleanDigits.slice(-6);
+      const generatedUsername = `user_${uniqueSuffix}`;
+      const tempEmail = `${generatedUsername}@mozhi.app`;
+      const tempPasswordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12);
+
+      user = new User({
+        username: generatedUsername,
+        displayName: `User ${uniqueSuffix}`,
+        email: tempEmail,
+        passwordHash: tempPasswordHash,
+        phoneNumber: input.phoneNumber,
+        countryCode: input.countryCode || '+91',
+        normalizedPhoneNumber,
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
+        authenticationProvider: 'phone',
+      });
+      await user.save();
+    } else {
+      if (!user.phoneVerified) {
+        user.phoneVerified = true;
+        user.phoneVerifiedAt = new Date();
+        user.normalizedPhoneNumber = normalizedPhoneNumber;
+        await user.save();
+      }
+    }
+
+    const tokens = this.generateTokens(user);
+    const refreshTokenHash = hashToken(tokens.refreshToken);
+
+    const session = new Session({
+      userId: user._id,
+      refreshTokenHash,
+      ipAddress,
+      userAgent,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    await session.save();
+
+    return {
+      user: user.toProfileJSON(),
+      tokens,
+      isNewUser,
+    };
+  }
+
+  async registerWithPhone(
+    input: PhoneRegisterInput,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<AuthResponse> {
+    const { normalizedPhoneNumber } = await smsService.verifyOtp(
+      input.phoneNumber,
+      input.countryCode,
+      input.otp,
+      'register'
+    );
+
+    const username = input.username.toLowerCase().trim();
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      throw new Error('Username is already taken');
+    }
+
+    const existingPhone = await User.findOne({
+      $or: [{ normalizedPhoneNumber }, { phoneNumber: normalizedPhoneNumber }],
+    });
+    if (existingPhone && existingPhone.phoneVerified) {
+      throw new Error('This phone number is already registered to another account. Please sign in instead.');
+    }
+
+    const tempEmail = `${username}@mozhi.app`;
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(input.password || crypto.randomBytes(16).toString('hex'), salt);
+
+    const user = new User({
+      username,
+      displayName: input.displayName.trim() || username,
+      email: tempEmail,
+      passwordHash,
+      phoneNumber: input.phoneNumber,
+      countryCode: input.countryCode || '+91',
+      normalizedPhoneNumber,
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
+      authenticationProvider: 'phone',
+    });
+    await user.save();
+
+    const tokens = this.generateTokens(user);
+    const refreshTokenHash = hashToken(tokens.refreshToken);
+
+    const session = new Session({
+      userId: user._id,
+      refreshTokenHash,
+      ipAddress,
+      userAgent,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    await session.save();
+
+    return {
+      user: user.toProfileJSON(),
+      tokens,
+    };
+  }
+
+  async changePhoneNumber(userId: string, input: ChangePhoneInput): Promise<UserProfile> {
+    const { normalizedPhoneNumber } = await smsService.verifyOtp(
+      input.newPhoneNumber,
+      input.countryCode,
+      input.otp,
+      'change_phone'
+    );
+
+    const existingPhone = await User.findOne({
+      _id: { $ne: userId },
+      $or: [{ normalizedPhoneNumber }, { phoneNumber: normalizedPhoneNumber }],
+    });
+
+    if (existingPhone && existingPhone.phoneVerified) {
+      throw new Error('This phone number is already registered to another user.');
+    }
+
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    user.phoneNumber = input.newPhoneNumber;
+    user.countryCode = input.countryCode || '+91';
+    user.normalizedPhoneNumber = normalizedPhoneNumber;
+    user.phoneVerified = true;
+    user.phoneVerifiedAt = new Date();
+    await user.save();
+
+    return user.toProfileJSON();
   }
 
   async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {

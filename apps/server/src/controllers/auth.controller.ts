@@ -70,6 +70,42 @@ export class AuthController {
       next(error);
     }
   }
+
+  async sendPhoneOtp(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.sendPhoneOtp(req.body);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async loginWithPhone(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.loginWithPhone(req.body, req.ip, req.headers['user-agent']);
+      sendSuccess(res, result, 'Phone login successful');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async registerWithPhone(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.registerWithPhone(req.body, req.ip, req.headers['user-agent']);
+      sendSuccess(res, result, 'Phone registration successful', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePhoneNumber(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.changePhoneNumber(req.userId!, req.body);
+      sendSuccess(res, result, 'Phone number updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

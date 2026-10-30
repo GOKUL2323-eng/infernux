@@ -10,6 +10,11 @@ export interface IUserDocument extends Document {
   avatarUrl?: string;
   coverImageUrl?: string;
   phoneNumber?: string;
+  countryCode?: string;
+  normalizedPhoneNumber?: string;
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: Date;
+  authenticationProvider?: 'local' | 'phone' | 'google';
   isVerified: boolean;
   isOnline: boolean;
   lastSeen: Date;
@@ -94,6 +99,28 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       sparse: true,
     },
+    countryCode: {
+      type: String,
+      default: '+91',
+    },
+    normalizedPhoneNumber: {
+      type: String,
+      sparse: true,
+      unique: true,
+      index: true,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerifiedAt: {
+      type: Date,
+    },
+    authenticationProvider: {
+      type: String,
+      enum: ['local', 'phone', 'google'],
+      default: 'local',
+    },
     isVerified: {
       type: Boolean,
       default: false,
@@ -133,6 +160,11 @@ UserSchema.methods.toProfileJSON = function (): UserProfile {
     displayName: this.displayName,
     email: this.email,
     phoneNumber: this.phoneNumber,
+    countryCode: this.countryCode,
+    normalizedPhoneNumber: this.normalizedPhoneNumber,
+    phoneVerified: this.phoneVerified,
+    phoneVerifiedAt: this.phoneVerifiedAt ? this.phoneVerifiedAt.toISOString() : undefined,
+    authenticationProvider: this.authenticationProvider,
     bio: this.bio,
     avatarUrl: this.avatarUrl,
     coverImageUrl: this.coverImageUrl,

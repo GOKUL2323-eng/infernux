@@ -8,6 +8,10 @@ import {
   loginSchema,
   refreshTokenSchema,
   changePasswordSchema,
+  sendPhoneOtpSchema,
+  verifyPhoneOtpSchema,
+  phoneRegisterSchema,
+  changePhoneSchema,
 } from '@infernux/shared';
 
 const router = Router();
@@ -27,6 +31,20 @@ router.patch('/change-password', authenticate, validateBody(changePasswordSchema
   authController.changePassword(req, res, next)
 );
 router.delete('/account', authenticate, (req, res, next) => authController.deleteAccount(req, res, next));
+
+// Phone number authentication routes
+router.post('/phone/send-otp', authLimiter, validateBody(sendPhoneOtpSchema), (req, res, next) =>
+  authController.sendPhoneOtp(req, res, next)
+);
+router.post('/phone/login', authLimiter, validateBody(verifyPhoneOtpSchema), (req, res, next) =>
+  authController.loginWithPhone(req, res, next)
+);
+router.post('/phone/register', authLimiter, validateBody(phoneRegisterSchema), (req, res, next) =>
+  authController.registerWithPhone(req, res, next)
+);
+router.patch('/phone/change', authenticate, validateBody(changePhoneSchema), (req, res, next) =>
+  authController.changePhoneNumber(req, res, next)
+);
 
 export default router;
 

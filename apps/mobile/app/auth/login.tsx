@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   Image,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,14 +16,27 @@ import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
+import {
+  CountryPickerModal,
+  CountryItem,
+  COUNTRIES,
+} from '../../src/components/CountryPickerModal';
 import { getLastAccount, SavedAccountInfo } from '../../src/api/client';
-import { spacing, typography } from '../../src/theme/spacing';
+import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isLoading, error } = useAuthStore();
+  const { login, sendPhoneOtp, isLoading, error } = useAuthStore();
   const { colors } = useThemeStore();
 
+  const [authMode, setAuthMode] = useState<'phone' | 'password'>('phone');
+
+  // Phone auth state
+  const [selectedCountry, setSelectedCountry] = useState<CountryItem>(COUNTRIES[0]); // India (+91)
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isCountryPickerVisible, setIsCountryPickerVisible] = useState(false);
+
+  // Password auth state
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -39,7 +53,34 @@ export default function LoginScreen() {
     });
   }, []);
 
-  const handleLogin = async () => {
+  const handleSendPhoneOtp = async () => {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (cleanPhone.length < 7) {
+      setValidationError('Please enter a valid phone number (at least 7 digits)');
+      return;
+    }
+    setValidationError('');
+
+    const res = await sendPhoneOtp({
+      phoneNumber: cleanPhone,
+      countryCode: selectedCountry.dialCode,
+      purpose: 'login',
+    });
+
+    if (res && res.success) {
+      router.push({
+        pathname: '/auth/verify-otp' as any,
+        params: {
+          phoneNumber: cleanPhone,
+          countryCode: selectedCountry.dialCode,
+          purpose: 'login',
+          maskedPhoneNumber: res.maskedPhoneNumber,
+        },
+      });
+    }
+  };
+
+  const handlePasswordLogin = async () => {
     if (!identifier.trim() || !password.trim()) {
       setValidationError('Please enter both identifier and password');
       return;
@@ -60,7 +101,7 @@ export default function LoginScreen() {
     setValidationError('');
     const success = await login({
       loginIdentifier: 'demo_user',
-      password: 'DemoPassword123!',
+      password: 'Password123!',
     });
     if (success) {
       router.replace('/' as any);
@@ -69,9 +110,9 @@ export default function LoginScreen() {
 
     const regSuccess = await useAuthStore.getState().register({
       username: 'demo_user',
-      displayName: 'Demo User',
-      email: 'demo_user@mozhi.app',
-      password: 'DemoPassword123!',
+      displayName: 'Gokul (Lead Engineer)',
+      email: 'demo@infernux.io',
+      password: 'Password123!',
     });
     if (regSuccess) {
       router.replace('/' as any);
@@ -84,6 +125,7 @@ export default function LoginScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Brand Header */}
         <View style={styles.brandHeader}>
           <Image
             source={require('../../assets/logo.png')}
@@ -96,6 +138,7 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        {/* Error Alert */}
         {(error || validationError) ? (
           <View style={[styles.errorBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.error }]}>
             <Ionicons name="alert-circle" size={18} color={colors.error} />
@@ -105,10 +148,14 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
+        {/* Saved Account Quick Banner */}
         {savedAccount ? (
           <TouchableOpacity
             style={[styles.savedAccountBanner, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => setIdentifier(savedAccount.username)}
+            onPress={() => {
+              setIdentifier(savedAccount.username);
+              setAuthMode('password');
+            }}
           >
             <Ionicons name="person-circle" size={32} color={colors.primary} />
             <View style={{ marginLeft: spacing.sm, flex: 1 }}>
@@ -119,45 +166,164 @@ export default function LoginScreen() {
                 Tap to re-login as @{savedAccount.username}
               </Text>
             </View>
-            <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : null}
 
-        <View style={styles.form}>
-          <Input
-            label="Username or Email"
-            placeholder="e.g. alex or alex@infernux.com"
-            value={identifier}
-            onChangeText={setIdentifier}
-            leftIcon="person-outline"
-            autoCapitalize="none"
-          />
+        {/* Authentication Mode Tabs */}
+        <View style={[styles.tabSelector, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.tabBtn,
+              authMode === 'phone' && [styles.activeTabBtn, { backgroundColor: colors.primary }],
+            ]}
+            onPress={() => {
+              setValidationError('');
+              setAuthMode('phone');
+            }}
+          >
+            <Ionicons
+              name="call-outline"
+              size={16}
+              color={authMode === 'phone' ? '#FFFFFF' : colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[
+                typography.button,
+                { color: authMode === 'phone' ? '#FFFFFF' : colors.textSecondary, fontSize: 13 },
+              ]}
+            >
+              Phone OTP
+            </Text>
+          </TouchableOpacity>
 
-          <Input
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={setPassword}
-            leftIcon="lock-closed-outline"
-            isPassword
-          />
-
-          <Button
-            title="Sign In"
-            onPress={handleLogin}
-            loading={isLoading}
-            style={{ marginTop: spacing.sm }}
-          />
-
-          <Button
-            title="⚡ One-Tap Demo Sign In"
-            variant="secondary"
-            onPress={handleQuickDemoLogin}
-            loading={isLoading}
-            style={{ marginTop: spacing.sm }}
-          />
+          <TouchableOpacity
+            style={[
+              styles.tabBtn,
+              authMode === 'password' && [styles.activeTabBtn, { backgroundColor: colors.primary }],
+            ]}
+            onPress={() => {
+              setValidationError('');
+              setAuthMode('password');
+            }}
+          >
+            <Ionicons
+              name="key-outline"
+              size={16}
+              color={authMode === 'password' ? '#FFFFFF' : colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[
+                typography.button,
+                { color: authMode === 'password' ? '#FFFFFF' : colors.textSecondary, fontSize: 13 },
+              ]}
+            >
+              Username / Password
+            </Text>
+          </TouchableOpacity>
         </View>
 
+        {/* Phone Number Authentication Form */}
+        {authMode === 'phone' ? (
+          <View style={styles.form}>
+            <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs }]}>
+              Enter your mobile phone number to receive a real SMS OTP:
+            </Text>
+
+            <View style={styles.phoneInputRow}>
+              {/* Country Code Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.countryBtn,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                ]}
+                onPress={() => setIsCountryPickerVisible(true)}
+              >
+                <Text style={styles.countryFlag}>{selectedCountry.flag}</Text>
+                <Text style={[typography.body1, { color: colors.text, fontWeight: '700', marginLeft: 4 }]}>
+                  {selectedCountry.dialCode}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+
+              {/* Number Input */}
+              <View
+                style={[
+                  styles.phoneTextInputWrapper,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.textSecondary}
+                  value={phoneNumber}
+                  onChangeText={(val) => {
+                    setValidationError('');
+                    setPhoneNumber(val);
+                  }}
+                  keyboardType="phone-pad"
+                  style={[styles.phoneTextInput, { color: colors.text }]}
+                  autoFocus={false}
+                />
+              </View>
+            </View>
+
+            <Button
+              title="Continue with SMS OTP"
+              onPress={handleSendPhoneOtp}
+              loading={isLoading}
+              style={{ marginTop: spacing.md }}
+            />
+
+            <Button
+              title="⚡ One-Tap Demo Sign In"
+              variant="secondary"
+              onPress={handleQuickDemoLogin}
+              loading={isLoading}
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
+        ) : (
+          /* Password Authentication Form */
+          <View style={styles.form}>
+            <Input
+              label="Username or Email"
+              placeholder="e.g. alex or alex@infernux.com"
+              value={identifier}
+              onChangeText={setIdentifier}
+              leftIcon="person-outline"
+              autoCapitalize="none"
+            />
+
+            <Input
+              label="Password"
+              placeholder="••••••••"
+              value={password}
+              onChangeText={setPassword}
+              leftIcon="lock-closed-outline"
+              isPassword
+            />
+
+            <Button
+              title="Sign In"
+              onPress={handlePasswordLogin}
+              loading={isLoading}
+              style={{ marginTop: spacing.sm }}
+            />
+
+            <Button
+              title="⚡ One-Tap Demo Sign In"
+              variant="secondary"
+              onPress={handleQuickDemoLogin}
+              loading={isLoading}
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
+        )}
+
+        {/* Footer */}
         <View style={styles.footer}>
           <Text style={[typography.body2, { color: colors.textSecondary }]}>
             Don't have an account?{' '}
@@ -168,6 +334,14 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Country Code Picker Modal */}
+        <CountryPickerModal
+          visible={isCountryPickerVisible}
+          selectedDialCode={selectedCountry.dialCode}
+          onSelect={(c) => setSelectedCountry(c)}
+          onClose={() => setIsCountryPickerVisible(false)}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -201,7 +375,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
@@ -213,8 +387,59 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
+  tabSelector: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: borderRadius.lg,
+    padding: 4,
+    marginBottom: spacing.lg,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: borderRadius.md,
+  },
+  activeTabBtn: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   form: {
     width: '100%',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  countryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    height: 52,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  countryFlag: {
+    fontSize: 20,
+  },
+  phoneTextInputWrapper: {
+    flex: 1,
+    height: 52,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+  },
+  phoneTextInput: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',
@@ -223,4 +448,3 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
 });
-

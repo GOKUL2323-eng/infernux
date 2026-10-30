@@ -11,6 +11,7 @@ import {
   FlatList,
   ActivityIndicator,
   Image,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,9 +22,14 @@ import { EditProfileModal } from '../../src/components/EditProfileModal';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { Avatar } from '../../src/components/Avatar';
+import {
+  CountryPickerModal,
+  CountryItem,
+  COUNTRIES,
+} from '../../src/components/CountryPickerModal';
 import { api } from '../../src/api/client';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
-import { UserSummary } from '@infernux/shared';
+import { UserSummary, UserProfile } from '@infernux/shared';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -53,6 +59,62 @@ export default function SettingsScreen() {
   // Blocked Users State
   const [blockedUsers, setBlockedUsers] = useState<UserSummary[]>([]);
   const [loadingBlocked, setLoadingBlocked] = useState(false);
+
+  // Phone Number Management State
+  const [isPhoneModalVisible, setIsPhoneModalVisible] = useState(false);
+  const [newPhone, setNewPhone] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState<CountryItem>(COUNTRIES[0]);
+  const [phoneStep, setPhoneStep] = useState<'input' | 'otp'>('input');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [isPhoneCountryPickerVisible, setIsPhoneCountryPickerVisible] = useState(false);
+
+  const handleRequestPhoneOtp = async () => {
+    const clean = newPhone.replace(/\D/g, '');
+    if (clean.length < 7) {
+      setPhoneError('Please enter a valid phone number');
+      return;
+    }
+    setPhoneError('');
+    setPhoneLoading(true);
+    const res = await api.post('/auth/phone/send-otp', {
+      phoneNumber: clean,
+      countryCode: phoneCountry.dialCode,
+      purpose: 'change_phone',
+    });
+    setPhoneLoading(false);
+    if (res.success) {
+      setPhoneStep('otp');
+    } else {
+      setPhoneError(res.error?.message || 'Failed to send OTP code');
+    }
+  };
+
+  const handleVerifyPhoneChange = async () => {
+    if (phoneOtp.length !== 6) {
+      setPhoneError('Please enter all 6 digits of the OTP code');
+      return;
+    }
+    setPhoneError('');
+    setPhoneLoading(true);
+    const res = await api.patch<UserProfile>('/auth/phone/change', {
+      newPhoneNumber: newPhone.replace(/\D/g, ''),
+      countryCode: phoneCountry.dialCode,
+      otp: phoneOtp,
+    });
+    setPhoneLoading(false);
+    if (res.success && res.data) {
+      updateUser(res.data);
+      Alert.alert('Success', 'Your phone number has been verified and updated!');
+      setIsPhoneModalVisible(false);
+      setPhoneStep('input');
+      setNewPhone('');
+      setPhoneOtp('');
+    } else {
+      setPhoneError(res.error?.message || 'Verification failed');
+    }
+  };
 
   const handleTogglePrivacy = async (value: boolean) => {
     setIsPrivate(value);
@@ -203,6 +265,23 @@ export default function SettingsScreen() {
               <Text style={[typography.body1, { color: colors.text, marginLeft: spacing.sm }]}>
                 Change Password
               </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          <TouchableOpacity style={styles.navRow} onPress={() => setIsPhoneModalVisible(true)}>
+            <View style={styles.rowLeft}>
+              <Ionicons name="call-outline" size={22} color={colors.primary} />
+              <View style={{ marginLeft: spacing.sm }}>
+                <Text style={[typography.body1, { color: colors.text }]}>Phone Number</Text>
+                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                  {user?.phoneNumber
+                    ? `${user.countryCode || '+91'} ${user.phoneNumber} • ${user.phoneVerified ? 'Verified ✅' : 'Unverified ⚠️'}`
+                    : 'Not added • Tap to link & verify via SMS'}
+                </Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -557,6 +636,136 @@ export default function SettingsScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Phone Number Verification Modal */}
+      {isPhoneModalVisible && (
+        <Modal
+          visible={isPhoneModalVisible}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setIsPhoneModalVisible(false)}
+        >
+          <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setIsPhoneModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[typography.h3, { color: colors.text }]}>Phone Number</Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: spacing.xl }}>
+              {phoneError ? (
+                <View style={[styles.errorBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.error }]}>
+                  <Ionicons name="alert-circle" size={18} color={colors.error} />
+                  <Text style={[typography.caption, { color: colors.error, marginLeft: spacing.xs, flex: 1 }]}>
+                    {phoneError}
+                  </Text>
+                </View>
+              ) : null}
+
+              {phoneStep === 'input' ? (
+                <>
+                  <Text style={[typography.body1, { color: colors.text, fontWeight: '700', marginBottom: 4 }]}>
+                    Verified Mobile Number
+                  </Text>
+                  <Text style={[typography.body2, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
+                    Link and verify your phone number using genuine SMS OTP delivery:
+                  </Text>
+
+                  <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs, fontWeight: '600' }]}>
+                    New Phone Number
+                  </Text>
+                  <View style={styles.phoneInputRow}>
+                    <TouchableOpacity
+                      style={[styles.countryBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                      onPress={() => setIsPhoneCountryPickerVisible(true)}
+                    >
+                      <Text style={styles.countryFlag}>{phoneCountry.flag}</Text>
+                      <Text style={[typography.body1, { color: colors.text, fontWeight: '700', marginLeft: 4 }]}>
+                        {phoneCountry.dialCode}
+                      </Text>
+                      <Ionicons name="chevron-down" size={14} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+
+                    <View
+                      style={[
+                        styles.phoneTextInputWrapper,
+                        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                      ]}
+                    >
+                      <TextInput
+                        placeholder="98765 43210"
+                        placeholderTextColor={colors.textSecondary}
+                        value={newPhone}
+                        onChangeText={(val: string) => {
+                          setPhoneError('');
+                          setNewPhone(val);
+                        }}
+                        keyboardType="phone-pad"
+                        style={[styles.phoneTextInput, { color: colors.text }]}
+                      />
+                    </View>
+                  </View>
+
+                  <Button
+                    title="Send SMS Verification Code"
+                    onPress={handleRequestPhoneOtp}
+                    loading={phoneLoading}
+                    style={{ marginTop: spacing.lg }}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[typography.body1, { color: colors.text, fontWeight: '700', marginBottom: 4 }]}>
+                    Enter 6-Digit OTP Code
+                  </Text>
+                  <Text style={[typography.body2, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
+                    Enter the code sent via carrier SMS to {phoneCountry.dialCode} {newPhone}:
+                  </Text>
+
+                  <Input
+                    label="Verification Code"
+                    placeholder="••••••"
+                    value={phoneOtp}
+                    onChangeText={(val) => {
+                      setPhoneError('');
+                      setPhoneOtp(val);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    leftIcon="shield-checkmark-outline"
+                  />
+
+                  <Button
+                    title="Verify & Link Phone Number"
+                    onPress={handleVerifyPhoneChange}
+                    loading={phoneLoading}
+                    style={{ marginTop: spacing.lg }}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setPhoneStep('input')}
+                    style={{ alignItems: 'center', marginTop: spacing.md }}
+                  >
+                    <Text style={[typography.caption, { color: colors.primary, fontWeight: '600' }]}>
+                      Change phone number
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
+
+      {/* Country Picker Modal for Phone in Settings */}
+      <CountryPickerModal
+        visible={isPhoneCountryPickerVisible}
+        selectedDialCode={phoneCountry.dialCode}
+        onSelect={(c) => setPhoneCountry(c)}
+        onClose={() => setIsPhoneCountryPickerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -665,5 +874,42 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: borderRadius.full,
     marginBottom: spacing.sm,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  countryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    height: 52,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  countryFlag: {
+    fontSize: 20,
+  },
+  phoneTextInputWrapper: {
+    flex: 1,
+    height: 52,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+  },
+  phoneTextInput: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

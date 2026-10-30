@@ -30,6 +30,11 @@ export interface UserSummary {
 export interface UserProfile extends UserSummary {
   email: string;
   phoneNumber?: string;
+  countryCode?: string;
+  normalizedPhoneNumber?: string;
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
+  authenticationProvider?: 'local' | 'phone' | 'google';
   bio?: string;
   coverImageUrl?: string;
   followersCount: number;
@@ -40,6 +45,15 @@ export interface UserProfile extends UserSummary {
   notifications: NotificationPreferences;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SendPhoneOtpResponse {
+  success: boolean;
+  message: string;
+  maskedPhoneNumber: string;
+  cooldownSeconds: number;
+  expiresInSeconds: number;
+  isRegistered?: boolean;
 }
 
 export interface AuthTokens {

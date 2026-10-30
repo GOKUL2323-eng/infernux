@@ -11,7 +11,17 @@ import {
 import { socketClient } from '../socket/socketClient';
 import { useChatStore } from './useChatStore';
 import { useFeedStore } from './useFeedStore';
-import { UserProfile, RegisterInput, LoginInput, AuthResponse } from '@infernux/shared';
+import {
+  UserProfile,
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  SendPhoneOtpInput,
+  VerifyPhoneOtpInput,
+  PhoneRegisterInput,
+  ChangePhoneInput,
+  SendPhoneOtpResponse,
+} from '@infernux/shared';
 
 interface AuthState {
   user: UserProfile | null;
@@ -21,6 +31,10 @@ interface AuthState {
 
   login: (input: LoginInput) => Promise<boolean>;
   register: (input: RegisterInput) => Promise<boolean>;
+  sendPhoneOtp: (input: SendPhoneOtpInput) => Promise<SendPhoneOtpResponse | null>;
+  loginWithPhone: (input: VerifyPhoneOtpInput) => Promise<boolean>;
+  registerWithPhone: (input: PhoneRegisterInput) => Promise<boolean>;
+  changePhoneNumber: (input: ChangePhoneInput) => Promise<boolean>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<boolean>;
   restoreSession: () => Promise<boolean>;
@@ -77,6 +91,76 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     } else {
       set({ error: res.error?.message || 'Registration failed', isLoading: false });
+      return false;
+    }
+  },
+
+  sendPhoneOtp: async (input: SendPhoneOtpInput) => {
+    set({ isLoading: true, error: null });
+    const res = await api.post<SendPhoneOtpResponse>('/auth/phone/send-otp', input);
+    set({ isLoading: false });
+    if (res.success && res.data) {
+      return res.data;
+    } else {
+      set({ error: res.error?.message || 'Failed to send OTP' });
+      return null;
+    }
+  },
+
+  loginWithPhone: async (input: VerifyPhoneOtpInput) => {
+    set({ isLoading: true, error: null });
+    const res = await api.post<AuthResponse>('/auth/phone/login', input);
+
+    if (res.success && res.data) {
+      await setAuthTokens(res.data.tokens.accessToken, res.data.tokens.refreshToken);
+      await saveLastAccount({
+        username: res.data.user.username,
+        displayName: res.data.user.displayName,
+        avatarUrl: res.data.user.avatarUrl,
+      });
+      set({ user: res.data.user, isAuthenticated: true, isLoading: false });
+      socketClient.connect();
+      useChatStore.getState().loadConversations();
+      useFeedStore.getState().loadFeed(true);
+      useFeedStore.getState().loadStories();
+      return true;
+    } else {
+      set({ error: res.error?.message || 'Verification failed', isLoading: false });
+      return false;
+    }
+  },
+
+  registerWithPhone: async (input: PhoneRegisterInput) => {
+    set({ isLoading: true, error: null });
+    const res = await api.post<AuthResponse>('/auth/phone/register', input);
+
+    if (res.success && res.data) {
+      await setAuthTokens(res.data.tokens.accessToken, res.data.tokens.refreshToken);
+      await saveLastAccount({
+        username: res.data.user.username,
+        displayName: res.data.user.displayName,
+        avatarUrl: res.data.user.avatarUrl,
+      });
+      set({ user: res.data.user, isAuthenticated: true, isLoading: false });
+      socketClient.connect();
+      useChatStore.getState().loadConversations();
+      useFeedStore.getState().loadFeed(true);
+      useFeedStore.getState().loadStories();
+      return true;
+    } else {
+      set({ error: res.error?.message || 'Registration failed', isLoading: false });
+      return false;
+    }
+  },
+
+  changePhoneNumber: async (input: ChangePhoneInput) => {
+    set({ isLoading: true, error: null });
+    const res = await api.patch<UserProfile>('/auth/phone/change', input);
+    if (res.success && res.data) {
+      set({ user: res.data, isLoading: false });
+      return true;
+    } else {
+      set({ error: res.error?.message || 'Failed to update phone number', isLoading: false });
       return false;
     }
   },
