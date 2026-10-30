@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore } from '../store/useMusicStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -9,8 +10,13 @@ export const MiniMusicPlayer: React.FC = () => {
   const { currentTrack, isPlaying, isMiniPlayerVisible, togglePlayPause, nextTrack, closeMiniPlayer } =
     useMusicStore();
   const { colors } = useThemeStore();
+  const insets = useSafeAreaInsets();
 
   if (!isMiniPlayerVisible || !currentTrack) return null;
+
+  // Responsive bottom calculation to sit perfectly above the dynamic tab bar
+  const bottomInset = insets.bottom > 0 ? insets.bottom : 8;
+  const bottomPosition = 56 + bottomInset + 8;
 
   return (
     <View
@@ -19,6 +25,7 @@ export const MiniMusicPlayer: React.FC = () => {
         {
           backgroundColor: colors.surfaceElevated,
           borderColor: colors.border,
+          bottom: bottomPosition,
         },
       ]}
     >
@@ -32,17 +39,29 @@ export const MiniMusicPlayer: React.FC = () => {
         </Text>
       </View>
       <View style={styles.controls}>
-        <TouchableOpacity onPress={togglePlayPause} style={styles.controlBtn}>
+        <TouchableOpacity
+          onPress={togglePlayPause}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={styles.controlBtn}
+        >
           <Ionicons
             name={isPlaying ? 'pause-circle' : 'play-circle'}
             size={36}
             color={colors.primary}
           />
         </TouchableOpacity>
-        <TouchableOpacity onPress={nextTrack} style={styles.controlBtn}>
+        <TouchableOpacity
+          onPress={nextTrack}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={styles.controlBtn}
+        >
           <Ionicons name="play-forward" size={22} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={closeMiniPlayer} style={styles.controlBtn}>
+        <TouchableOpacity
+          onPress={closeMiniPlayer}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={styles.controlBtn}
+        >
           <Ionicons name="close" size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -53,7 +72,6 @@ export const MiniMusicPlayer: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 60, // Above bottom tab bar
     left: spacing.md,
     right: spacing.md,
     flexDirection: 'row',

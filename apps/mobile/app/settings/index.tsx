@@ -247,9 +247,9 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.navRow} onPress={() => setIsEditProfileVisible(true)}>
             <View style={styles.rowLeft}>
               <Ionicons name="person-circle-outline" size={22} color={colors.primary} />
-              <View style={{ marginLeft: spacing.sm }}>
-                <Text style={[typography.body1, { color: colors.text }]}>Edit Profile</Text>
-                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              <View style={styles.settingTextContainer}>
+                <Text numberOfLines={1} style={[typography.body1, { color: colors.text }]}>Edit Profile</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
                   {user?.displayName || user?.username} • Change photo & bio
                 </Text>
               </View>
@@ -262,7 +262,7 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.navRow} onPress={() => setIsPasswordModalVisible(true)}>
             <View style={styles.rowLeft}>
               <Ionicons name="key-outline" size={22} color={colors.primary} />
-              <Text style={[typography.body1, { color: colors.text, marginLeft: spacing.sm }]}>
+              <Text numberOfLines={1} style={[typography.body1, { color: colors.text, marginLeft: spacing.sm, flex: 1 }]}>
                 Change Password
               </Text>
             </View>
@@ -274,9 +274,9 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.navRow} onPress={() => setIsPhoneModalVisible(true)}>
             <View style={styles.rowLeft}>
               <Ionicons name="call-outline" size={22} color={colors.primary} />
-              <View style={{ marginLeft: spacing.sm }}>
-                <Text style={[typography.body1, { color: colors.text }]}>Phone Number</Text>
-                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              <View style={styles.settingTextContainer}>
+                <Text numberOfLines={1} style={[typography.body1, { color: colors.text }]}>Phone Number</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
                   {user?.phoneNumber
                     ? `${user.countryCode || '+91'} ${user.phoneNumber} • ${user.phoneVerified ? 'Verified ✅' : 'Unverified ⚠️'}`
                     : 'Not added • Tap to link & verify via SMS'}
@@ -311,9 +311,9 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <Ionicons name="lock-closed" size={22} color={colors.primary} />
-              <View style={{ marginLeft: spacing.sm }}>
-                <Text style={[typography.body1, { color: colors.text }]}>Private Account</Text>
-                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              <View style={styles.settingTextContainer}>
+                <Text numberOfLines={1} style={[typography.body1, { color: colors.text }]}>Private Account</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
                   Only approved followers can view your posts
                 </Text>
               </View>
@@ -330,9 +330,9 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <Ionicons name="radio-outline" size={22} color={colors.online} />
-              <View style={{ marginLeft: spacing.sm }}>
-                <Text style={[typography.body1, { color: colors.text }]}>Activity Status</Text>
-                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              <View style={styles.settingTextContainer}>
+                <Text numberOfLines={1} style={[typography.body1, { color: colors.text }]}>Activity Status</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
                   Show online status in direct messages
                 </Text>
               </View>
@@ -820,6 +820,11 @@ const styles = StyleSheet.create({
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  settingTextContainer: {
+    marginLeft: spacing.sm,
     flex: 1,
   },
   divider: {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from './Avatar';
 import { useThemeStore } from '../store/useThemeStore';
 import { typography, spacing } from '../theme/spacing';
@@ -32,7 +33,7 @@ export const StoryRing: React.FC<StoryRingProps> = ({
             style={styles.gradientRing}
           >
             <View style={[styles.innerCircle, { backgroundColor: colors.background }]}>
-              <Avatar url={user.avatarUrl} name={user.displayName} size={60} />
+              <Avatar url={user.avatarUrl} name={user.displayName} size={58} />
             </View>
           </LinearGradient>
         ) : (
@@ -42,12 +43,19 @@ export const StoryRing: React.FC<StoryRingProps> = ({
               { borderColor: isCurrentUser ? colors.border : colors.textMuted },
             ]}
           >
-            <Avatar url={user.avatarUrl} name={user.displayName} size={60} />
+            <Avatar url={user.avatarUrl} name={user.displayName} size={58} />
+          </View>
+        )}
+
+        {isCurrentUser && (
+          <View style={[styles.plusBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+            <Ionicons name="add" size={14} color="#FFFFFF" />
           </View>
         )}
       </View>
       <Text
         numberOfLines={1}
+        ellipsizeMode="tail"
         style={[
           typography.caption,
           { color: colors.text, marginTop: spacing.xs, textAlign: 'center', width: 72 },
@@ -69,6 +77,7 @@ const styles = StyleSheet.create({
     height: 70,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   gradientRing: {
     width: 68,
@@ -78,9 +87,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   innerCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -89,6 +98,17 @@ const styles = StyleSheet.create({
     height: 66,
     borderRadius: 33,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

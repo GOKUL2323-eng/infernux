@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{
     phoneNumber: string;
     countryCode?: string;
@@ -32,6 +34,10 @@ export default function VerifyOtpScreen() {
   const { loginWithPhone, registerWithPhone, changePhoneNumber, sendPhoneOtp, isLoading, error } =
     useAuthStore();
   const { colors } = useThemeStore();
+
+  // Responsive OTP box calculations (guaranteed fit on small 320px screens)
+  const boxWidth = Math.min(48, Math.floor((width - 64) / 6));
+  const boxHeight = Math.round(boxWidth * 1.15);
 
   const phoneNumber = params.phoneNumber || '';
   const countryCode = params.countryCode || '+91';
@@ -208,6 +214,8 @@ export default function VerifyOtpScreen() {
               style={[
                 styles.otpBox,
                 {
+                  width: boxWidth,
+                  height: boxHeight,
                   backgroundColor: colors.surfaceElevated,
                   borderColor: digit ? colors.primary : colors.border,
                   color: colors.text,
@@ -274,7 +282,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xxl,
   },

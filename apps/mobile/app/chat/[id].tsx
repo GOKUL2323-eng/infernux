@@ -12,7 +12,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   useAudioRecorder,
@@ -38,6 +38,7 @@ import { MessageSummary } from '@infernux/shared';
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { colors } = useThemeStore();
   const {
@@ -353,45 +354,58 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Messages Feed */}
-      <FlatList
-        ref={flatListRef}
-        data={conversationMessages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessageItem}
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
+      {/* Messages Feed & Input inside KeyboardAvoidingView */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={conversationMessages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessageItem}
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
 
-      {/* Typing indicator */}
-      {currentTyping.length > 0 && (
-        <View style={styles.typingRow}>
-          <Text style={[typography.caption, { color: colors.textSecondary }]}>
-            {currentTyping.join(', ')} {currentTyping.length === 1 ? 'is' : 'are'} typing...
-          </Text>
-        </View>
-      )}
-
-      {/* Reply Banner Preview */}
-      {replyingTo && (
-        <View style={[styles.replyBanner, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>
-              Replying to @{replyingTo.sender.username}
-            </Text>
-            <Text numberOfLines={1} style={[typography.caption, { color: colors.textSecondary }]}>
-              {replyingTo.content}
+        {/* Typing indicator */}
+        {currentTyping.length > 0 && (
+          <View style={styles.typingRow}>
+            <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              {currentTyping.join(', ')} {currentTyping.length === 1 ? 'is' : 'are'} typing...
             </Text>
           </View>
-          <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 4 }}>
-            <Ionicons name="close" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
 
-      {/* Input Bar */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        {/* Reply Banner Preview */}
+        {replyingTo && (
+          <View style={[styles.replyBanner, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>
+                Replying to @{replyingTo.sender.username}
+              </Text>
+              <Text numberOfLines={1} style={[typography.caption, { color: colors.textSecondary }]}>
+                {replyingTo.content}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 4 }}>
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Input Bar */}
+        <View
+          style={[
+            styles.inputBar,
+            {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.sm,
+            },
+          ]}
+        >
           <TouchableOpacity onPress={handlePickImage} disabled={isUploading} style={styles.inputActionBtn}>
             <Ionicons name="image-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
@@ -546,18 +560,22 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    marginLeft: spacing.xs,
   },
   bubbleSender: {
     borderBottomRightRadius: 2,
+    marginRight: spacing.xs,
+    marginLeft: spacing.lg,
   },
   bubbleReceiver: {
     borderBottomLeftRadius: 2,
     borderWidth: 0.5,
+    marginLeft: spacing.xs,
+    marginRight: spacing.lg,
   },
   attachmentImage: {
-    width: 220,
-    height: 180,
+    maxWidth: 240,
+    width: '100%',
+    aspectRatio: 4 / 3,
     borderRadius: borderRadius.md,
   },
   reactionsBadge: {

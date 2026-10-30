@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from './Avatar';
 import { api } from '../api/client';
 import { useThemeStore } from '../store/useThemeStore';
@@ -34,6 +35,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   onCommentAdded,
 }) => {
   const { colors } = useThemeStore();
+  const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<CommentSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -133,7 +135,16 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
           )}
 
           {/* Input Bar */}
-          <View style={[styles.inputContainer, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border }]}>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderTopColor: colors.border,
+                paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.sm,
+              },
+            ]}
+          >
             <TextInput
               placeholder="Add a comment..."
               placeholderTextColor={colors.textMuted}

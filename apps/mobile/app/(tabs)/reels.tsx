@@ -17,7 +17,8 @@ interface ViewToken {
   index: number | null;
   isViewable: boolean;
 }
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,9 +30,6 @@ import { CommentsModal } from '../../src/components/CommentsModal';
 import { api } from '../../src/api/client';
 import { spacing, typography } from '../../src/theme/spacing';
 import { ReelSummary } from '@infernux/shared';
-
-const { width, height } = Dimensions.get('window');
-const REEL_HEIGHT = height - 110; // Minus tab bar height
 
 function ReelVideo({
   videoUrl,
@@ -88,12 +86,18 @@ function ReelVideo({
 
 export default function ReelsScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { reels, loadReels, likeReel, saveReel, activeReelIndex, setActiveReelIndex } = useFeedStore();
   const { colors } = useThemeStore();
   const [paused, setPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [commentsModalReelId, setCommentsModalReelId] = useState<string | null>(null);
+
+  // Dynamic reel height taking tab bar height and top safe area into account
+  const bottomTabBarHeight = 56 + (insets.bottom > 0 ? insets.bottom : 8);
+  const reelHeight = height - bottomTabBarHeight - insets.top;
 
   useEffect(() => {
     loadReels();
@@ -155,7 +159,7 @@ export default function ReelsScreen() {
     const isActive = index === activeReelIndex;
 
     return (
-      <View style={[styles.reelContainer, { backgroundColor: '#000000' }]}>
+      <View style={[styles.reelContainer, { width, height: reelHeight, backgroundColor: '#000000' }]}>
         {/* Video Player */}
         <TouchableOpacity
           activeOpacity={1}
@@ -172,7 +176,9 @@ export default function ReelsScreen() {
 
           {paused && (
             <View style={styles.pauseOverlay}>
-              <Ionicons name="play" size={54} color="rgba(255,255,255,0.8)" />
+              <View style={styles.pauseCircle}>
+                <Ionicons name="play" size={48} color="rgba(255,255,255,0.9)" />
+              </View>
             </View>
           )}
         </TouchableOpacity>
@@ -180,6 +186,7 @@ export default function ReelsScreen() {
         {/* Volume Mute Toggle Floating Button */}
         <TouchableOpacity
           onPress={() => setIsMuted(!isMuted)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.volumeBtn}
         >
           <Ionicons
@@ -190,7 +197,7 @@ export default function ReelsScreen() {
         </TouchableOpacity>
 
         {/* Right Floating Actions */}
-        <View style={styles.rightActions}>
+        <View style={[styles.rightActions, { bottom: insets.bottom > 0 ? insets.bottom + 16 : 80 }]}>
           <TouchableOpacity
             style={styles.creatorAvatarWrapper}
             onPress={() => handleFollowToggle(item.creatorId, item.isFollowingCreator)}
@@ -203,7 +210,11 @@ export default function ReelsScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => likeReel(item.id)}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => likeReel(item.id)}
+          >
             <Ionicons
               name={item.isLiked ? 'heart' : 'heart-outline'}
               size={32}
@@ -214,18 +225,27 @@ export default function ReelsScreen() {
 
           <TouchableOpacity
             style={styles.actionBtn}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             onPress={() => setCommentsModalReelId(item.id)}
           >
             <Ionicons name="chatbubble-outline" size={28} color="#FFFFFF" />
             <Text style={styles.actionText}>{item.commentsCount}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handleShareReel(item)}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => handleShareReel(item)}
+          >
             <Ionicons name="paper-plane-outline" size={28} color="#FFFFFF" />
             <Text style={styles.actionText}>{item.sharesCount}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => saveReel(item.id)}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => saveReel(item.id)}
+          >
             <Ionicons
               name={item.isSaved ? 'bookmark' : 'bookmark-outline'}
               size={28}
@@ -233,7 +253,11 @@ export default function ReelsScreen() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handleReelOptions(item)}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => handleReelOptions(item)}
+          >
             <Ionicons name="ellipsis-horizontal" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
@@ -247,7 +271,7 @@ export default function ReelsScreen() {
         </View>
 
         {/* Bottom Details Overlay */}
-        <View style={styles.bottomOverlay}>
+        <View style={[styles.bottomOverlay, { paddingBottom: insets.bottom > 0 ? insets.bottom + 12 : spacing.lg }]}>
           <TouchableOpacity onPress={() => router.push('/search' as any)}>
             <Text style={[typography.body1, styles.creatorName]}>
               @{item.creator.username}
@@ -283,13 +307,13 @@ export default function ReelsScreen() {
         renderItem={renderReelItem}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={REEL_HEIGHT}
+        snapToInterval={reelHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={[styles.emptyContainer, { height: reelHeight }]}>
             <Ionicons name="videocam-outline" size={60} color="#666" />
             <Text style={[typography.h3, { color: '#FFF', marginTop: spacing.md }]}>
               No Reels Found
@@ -320,18 +344,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   reelContainer: {
-    width,
-    height: REEL_HEIGHT,
     position: 'relative',
     justifyContent: 'flex-end',
   },
   pauseOverlay: {
-    position: 'absolute',
-    top: '40%',
-    left: '45%',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 30,
-    padding: 10,
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  pauseCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 4,
   },
   volumeBtn: {
     position: 'absolute',
@@ -348,7 +377,6 @@ const styles = StyleSheet.create({
   rightActions: {
     position: 'absolute',
     right: spacing.md,
-    bottom: 80,
     alignItems: 'center',
   },
   creatorAvatarWrapper: {
@@ -388,8 +416,8 @@ const styles = StyleSheet.create({
   },
   bottomOverlay: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
-    width: width - 80,
+    paddingRight: 76,
+    width: '100%',
   },
   creatorName: {
     color: '#FFFFFF',
@@ -411,7 +439,6 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    height: REEL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,

@@ -4,8 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '../../src/store/useCallStore';
@@ -16,8 +17,16 @@ import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 
 export default function CallScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { colors } = useThemeStore();
+
+  // Responsive button sizing based on screen width
+  const btnSize = Math.min(52, Math.floor((width - 64) / 5.2));
+  const btnRadius = Math.floor(btnSize / 2);
+  const endBtnSize = Math.min(60, Math.floor(btnSize * 1.15));
+  const endBtnRadius = Math.floor(endBtnSize / 2);
   const {
     activeCall,
     callDuration,
@@ -108,14 +117,15 @@ export default function CallScreen() {
       )}
 
       {/* Control Buttons Bar */}
-      <View style={styles.controlsBar}>
+      <View style={[styles.controlsBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.md }]}>
         <TouchableOpacity
           onPress={toggleMute}
-          style={[styles.controlBtn, isMuted && { backgroundColor: '#FFFFFF' }]}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={[styles.controlBtn, { width: btnSize, height: btnSize, borderRadius: btnRadius }, isMuted && { backgroundColor: '#FFFFFF' }]}
         >
           <Ionicons
             name={isMuted ? 'mic-off' : 'mic'}
-            size={24}
+            size={Math.min(24, Math.floor(btnSize * 0.46))}
             color={isMuted ? '#000000' : '#FFFFFF'}
           />
         </TouchableOpacity>
@@ -123,29 +133,35 @@ export default function CallScreen() {
         {activeCall?.callType === 'video' && (
           <TouchableOpacity
             onPress={toggleVideo}
-            style={[styles.controlBtn, !isVideoEnabled && { backgroundColor: '#FFFFFF' }]}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={[styles.controlBtn, { width: btnSize, height: btnSize, borderRadius: btnRadius }, !isVideoEnabled && { backgroundColor: '#FFFFFF' }]}
           >
             <Ionicons
               name={isVideoEnabled ? 'videocam' : 'videocam-off'}
-              size={24}
+              size={Math.min(24, Math.floor(btnSize * 0.46))}
               color={!isVideoEnabled ? '#000000' : '#FFFFFF'}
             />
           </TouchableOpacity>
         )}
 
         {activeCall?.callType === 'video' && (
-          <TouchableOpacity onPress={toggleCameraFacing} style={styles.controlBtn}>
-            <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
+          <TouchableOpacity
+            onPress={toggleCameraFacing}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={[styles.controlBtn, { width: btnSize, height: btnSize, borderRadius: btnRadius }]}
+          >
+            <Ionicons name="camera-reverse" size={Math.min(24, Math.floor(btnSize * 0.46))} color="#FFFFFF" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity
           onPress={toggleSpeaker}
-          style={[styles.controlBtn, isSpeakerOn && { backgroundColor: '#FFFFFF' }]}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={[styles.controlBtn, { width: btnSize, height: btnSize, borderRadius: btnRadius }, isSpeakerOn && { backgroundColor: '#FFFFFF' }]}
         >
           <Ionicons
             name={isSpeakerOn ? 'volume-high' : 'volume-medium'}
-            size={24}
+            size={Math.min(24, Math.floor(btnSize * 0.46))}
             color={isSpeakerOn ? '#000000' : '#FFFFFF'}
           />
         </TouchableOpacity>
@@ -153,9 +169,10 @@ export default function CallScreen() {
         {/* End Call */}
         <TouchableOpacity
           onPress={handleEndCall}
-          style={[styles.endCallBtn, { backgroundColor: colors.error }]}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          style={[styles.endCallBtn, { width: endBtnSize, height: endBtnSize, borderRadius: endBtnRadius, backgroundColor: colors.error }]}
         >
-          <Ionicons name="call" size={28} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+          <Ionicons name="call" size={Math.min(28, Math.floor(endBtnSize * 0.48))} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -217,9 +234,9 @@ const styles = StyleSheet.create({
   controlsBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
+    justifyContent: 'space-evenly',
+    width: '100%',
+    marginBottom: spacing.xs,
   },
   controlBtn: {
     width: 52,

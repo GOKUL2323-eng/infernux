@@ -189,9 +189,10 @@ export default function LoginScreen() {
               style={{ marginRight: 6 }}
             />
             <Text
+              numberOfLines={1}
               style={[
                 typography.button,
-                { color: authMode === 'phone' ? '#FFFFFF' : colors.textSecondary, fontSize: 13 },
+                { color: authMode === 'phone' ? '#FFFFFF' : colors.textSecondary, fontSize: 12.5 },
               ]}
             >
               Phone OTP
@@ -215,12 +216,13 @@ export default function LoginScreen() {
               style={{ marginRight: 6 }}
             />
             <Text
+              numberOfLines={1}
               style={[
                 typography.button,
-                { color: authMode === 'password' ? '#FFFFFF' : colors.textSecondary, fontSize: 13 },
+                { color: authMode === 'password' ? '#FFFFFF' : colors.textSecondary, fontSize: 12.5 },
               ]}
             >
-              Username / Password
+              Password
             </Text>
           </TouchableOpacity>
         </View>

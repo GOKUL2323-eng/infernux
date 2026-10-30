@@ -78,10 +78,10 @@ export default function SearchScreen() {
       >
         <Avatar url={item.avatarUrl} name={item.displayName} size={46} isVerified={item.isVerified} />
         <View style={styles.userInfo}>
-          <Text style={[typography.body1, { color: colors.text, fontWeight: '700' }]}>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.body1, { color: colors.text, fontWeight: '700' }]}>
             {item.displayName}
           </Text>
-          <Text style={[typography.caption, { color: colors.textSecondary }]}>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
             @{item.username}
           </Text>
         </View>

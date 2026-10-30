@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
@@ -109,7 +110,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={colors.text} />
@@ -202,7 +203,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             style={{ marginTop: spacing.lg }}
           />
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };

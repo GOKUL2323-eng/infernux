@@ -32,18 +32,22 @@ export const PostCard: React.FC<PostCardProps> = ({
     <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.authorRow} onPress={onUserPress}>
+        <TouchableOpacity style={styles.authorRow} onPress={onUserPress} activeOpacity={0.8}>
           <Avatar url={post.author.avatarUrl} name={post.author.displayName} size={38} isVerified={post.author.isVerified} />
-          <View style={{ marginLeft: spacing.sm }}>
-            <Text style={[typography.body2, { color: colors.text, fontWeight: '700' }]}>
+          <View style={styles.authorTextContainer}>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.body2, { color: colors.text, fontWeight: '700' }]}>
               {post.author.displayName || post.author.username}
             </Text>
-            <Text style={[typography.caption, { color: colors.textSecondary }]}>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[typography.caption, { color: colors.textSecondary }]}>
               @{post.author.username}
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onOptionsPress} style={{ padding: spacing.xs }}>
+        <TouchableOpacity
+          onPress={onOptionsPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.optionsBtn}
+        >
           <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -66,21 +70,36 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
-          <TouchableOpacity onPress={onLike} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={onLike}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={styles.actionBtn}
+          >
             <Ionicons
               name={post.isLiked ? 'heart' : 'heart-outline'}
               size={26}
               color={post.isLiked ? colors.error : colors.text}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onComment} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={onComment}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={styles.actionBtn}
+          >
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onShare} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={onShare}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={styles.actionBtn}
+          >
             <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={onSave}>
+        <TouchableOpacity
+          onPress={onSave}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Ionicons
             name={post.isSaved ? 'bookmark' : 'bookmark-outline'}
             size={24}
@@ -132,6 +151,19 @@ const styles = StyleSheet.create({
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  authorTextContainer: {
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  optionsBtn: {
+    padding: spacing.xs,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mediaContainer: {
     width: '100%',

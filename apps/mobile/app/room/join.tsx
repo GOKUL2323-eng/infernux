@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,7 +65,7 @@ export default function JoinRoomScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[typography.h3, { color: colors.text }]}>Join via Room Key</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
@@ -121,7 +122,7 @@ export default function JoinRoomScreen() {
           style={{ marginTop: spacing.md }}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -1,10 +1,16 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../src/store/useThemeStore';
 
 export default function TabLayout() {
   const { colors } = useThemeStore();
+  const insets = useSafeAreaInsets();
+
+  // Responsive safe-area bottom padding for gesture bars vs 3-button nav
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : 8;
+  const tabHeight = 56 + bottomPadding;
 
   return (
     <Tabs
@@ -14,8 +20,8 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
-          height: 60,
-          paddingBottom: 8,
+          height: tabHeight,
+          paddingBottom: bottomPadding,
           paddingTop: 6,
         },
         tabBarActiveTintColor: colors.primary,

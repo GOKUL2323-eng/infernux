@@ -6,7 +6,7 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   RefreshControl,
   Alert,
 } from 'react-native';
@@ -23,15 +23,15 @@ import { api } from '../../src/api/client';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 import { PostSummary, ReelSummary } from '@infernux/shared';
 
-const { width } = Dimensions.get('window');
-const GRID_ITEM_SIZE = (width - 4) / 3;
-
 type ProfileTab = 'posts' | 'reels' | 'saved';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { user, logout, deleteAccount } = useAuthStore();
   const { colors } = useThemeStore();
+
+  const gridItemSize = Math.floor((width - 4) / 3);
 
   const [activeTab, setActiveTab] = useState<ProfileTab>('posts');
   const [userPosts, setUserPosts] = useState<PostSummary[]>([]);
@@ -211,7 +211,7 @@ export default function ProfileScreen() {
             onPress={() => setIsEditProfileVisible(true)}
             style={[styles.editBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
           >
-            <Text style={[typography.button, { color: colors.text, fontSize: 13 }]}>
+            <Text numberOfLines={1} style={[typography.button, { color: colors.text, fontSize: 13 }]}>
               Edit Profile
             </Text>
           </TouchableOpacity>
@@ -220,7 +220,7 @@ export default function ProfileScreen() {
             style={[styles.shareBtn, { backgroundColor: colors.primary }]}
           >
             <Ionicons name="key" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-            <Text style={[typography.button, { color: '#FFFFFF', fontSize: 13 }]}>
+            <Text numberOfLines={1} style={[typography.button, { color: '#FFFFFF', fontSize: 13 }]}>
               New Room
             </Text>
           </TouchableOpacity>
@@ -229,7 +229,7 @@ export default function ProfileScreen() {
             style={[styles.logoutBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
           >
             <Ionicons name="log-out-outline" size={14} color={colors.error} style={{ marginRight: 4 }} />
-            <Text style={[typography.button, { color: colors.error, fontSize: 13 }]}>
+            <Text numberOfLines={1} style={[typography.button, { color: colors.error, fontSize: 13 }]}>
               Sign Out
             </Text>
           </TouchableOpacity>
@@ -282,47 +282,12 @@ export default function ProfileScreen() {
 
         {/* Grid Display */}
         {activeTab === 'posts' ? (
-          <View style={styles.grid}>
-            {userPosts.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={styles.gridCell}
-                onPress={() => setSelectedPostIdForComments(post.id)}
-              >
-                <Image
-                  source={{ uri: post.media[0]?.url }}
-                  style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : activeTab === 'reels' ? (
-          <View style={styles.grid}>
-            {userReels.map((reel) => (
-              <TouchableOpacity
-                key={reel.id}
-                style={styles.gridCell}
-                onPress={() => router.push('/(tabs)/reels' as any)}
-              >
-                <Image
-                  source={{ uri: reel.thumbnailUrl }}
-                  style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
-                />
-                <View style={styles.reelOverlay}>
-                  <Ionicons name="play" size={14} color="#FFFFFF" />
-                  <Text style={styles.reelViews}>{reel.viewsCount}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {userPosts
-              .filter((p) => p.isSaved)
-              .map((post) => (
+          userPosts.length > 0 ? (
+            <View style={styles.grid}>
+              {userPosts.map((post) => (
                 <TouchableOpacity
                   key={post.id}
-                  style={styles.gridCell}
+                  style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
                   onPress={() => setSelectedPostIdForComments(post.id)}
                 >
                   <Image
@@ -331,7 +296,69 @@ export default function ProfileScreen() {
                   />
                 </TouchableOpacity>
               ))}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.tabEmptyContainer}>
+              <Ionicons name="images-outline" size={40} color={colors.textMuted} />
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                No posts shared yet
+              </Text>
+            </View>
+          )
+        ) : activeTab === 'reels' ? (
+          userReels.length > 0 ? (
+            <View style={styles.grid}>
+              {userReels.map((reel) => (
+                <TouchableOpacity
+                  key={reel.id}
+                  style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
+                  onPress={() => router.push('/(tabs)/reels' as any)}
+                >
+                  <Image
+                    source={{ uri: reel.thumbnailUrl }}
+                    style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
+                  />
+                  <View style={styles.reelOverlay}>
+                    <Ionicons name="play" size={14} color="#FFFFFF" />
+                    <Text style={styles.reelViews}>{reel.viewsCount}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.tabEmptyContainer}>
+              <Ionicons name="videocam-outline" size={40} color={colors.textMuted} />
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                No reels created yet
+              </Text>
+            </View>
+          )
+        ) : (
+          userPosts.filter((p) => p.isSaved).length > 0 ? (
+            <View style={styles.grid}>
+              {userPosts
+                .filter((p) => p.isSaved)
+                .map((post) => (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
+                    onPress={() => setSelectedPostIdForComments(post.id)}
+                  >
+                    <Image
+                      source={{ uri: post.media[0]?.url }}
+                      style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
+                    />
+                  </TouchableOpacity>
+                ))}
+            </View>
+          ) : (
+            <View style={styles.tabEmptyContainer}>
+              <Ionicons name="bookmark-outline" size={40} color={colors.textMuted} />
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                No saved posts
+              </Text>
+            </View>
+          )
         )}
       </ScrollView>
 
@@ -431,7 +458,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   editBtn: {
-    flex: 1,
+    flex: 1.2,
     height: 36,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -439,18 +466,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shareBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     height: 36,
     borderRadius: borderRadius.md,
   },
   logoutBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     height: 36,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -472,9 +501,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   gridCell: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
     position: 'relative',
+  },
+  tabEmptyContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
   },
   gridImage: {
     width: '100%',

@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatStore } from '../../src/store/useChatStore';
@@ -52,7 +53,7 @@ export default function CreateRoomScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Modal Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[typography.h3, { color: colors.text }]}>Create Protected Room</Text>
@@ -136,7 +137,7 @@ export default function CreateRoomScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

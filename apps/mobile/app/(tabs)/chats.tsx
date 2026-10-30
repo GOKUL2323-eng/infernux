@@ -178,16 +178,20 @@ export default function ChatsScreen() {
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[typography.h2, { color: colors.text }]}>Messages & Rooms</Text>
+        <Text numberOfLines={1} style={[typography.h2, { color: colors.text, flex: 1 }]}>
+          Messages & Rooms
+        </Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={styles.headerBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             onPress={() => router.push('/room/join' as any)}
           >
             <Ionicons name="key-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             onPress={() => router.push('/room/create' as any)}
           >
             <Ionicons name="add-circle-outline" size={24} color={colors.text} />
@@ -202,11 +206,14 @@ export default function ChatsScreen() {
           style={[styles.tabBtn, activeTab === 'direct' && { backgroundColor: colors.surface }]}
         >
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
               typography.caption,
               {
                 color: activeTab === 'direct' ? colors.primary : colors.textSecondary,
                 fontWeight: activeTab === 'direct' ? '700' : '500',
+                fontSize: 11,
               },
             ]}
           >
@@ -219,15 +226,18 @@ export default function ChatsScreen() {
           style={[styles.tabBtn, activeTab === 'rooms' && { backgroundColor: colors.surface }]}
         >
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
               typography.caption,
               {
                 color: activeTab === 'rooms' ? colors.primary : colors.textSecondary,
                 fontWeight: activeTab === 'rooms' ? '700' : '500',
+                fontSize: 11,
               },
             ]}
           >
-            Rooms & Keys ({roomConversations.length})
+            Rooms ({roomConversations.length})
           </Text>
         </TouchableOpacity>
 
@@ -236,11 +246,14 @@ export default function ChatsScreen() {
           style={[styles.tabBtn, activeTab === 'calls' && { backgroundColor: colors.surface }]}
         >
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
               typography.caption,
               {
                 color: activeTab === 'calls' ? colors.primary : colors.textSecondary,
                 fontWeight: activeTab === 'calls' ? '700' : '500',
+                fontSize: 11,
               },
             ]}
           >

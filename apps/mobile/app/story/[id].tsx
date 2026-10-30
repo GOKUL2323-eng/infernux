@@ -10,7 +10,7 @@ import {
   TouchableWithoutFeedback,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../src/store/useFeedStore';
@@ -25,6 +25,7 @@ const { width, height } = Dimensions.get('window');
 export default function StoryViewerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { stories } = useFeedStore();
 
@@ -204,7 +205,7 @@ export default function StoryViewerScreen() {
 
       {/* Bottom Section */}
       {currentStory.creatorId !== user?.id ? (
-        <View style={styles.bottomContainer}>
+        <View style={[styles.bottomContainer, { bottom: insets.bottom > 0 ? insets.bottom + 10 : 24 }]}>
           {/* Quick Reaction Emojis */}
           <View style={styles.quickEmojisRow}>
             {['❤️', '🔥', '😂', '😮', '👏'].map((emoji) => (
@@ -234,7 +235,7 @@ export default function StoryViewerScreen() {
           </View>
         </View>
       ) : (
-        <View style={styles.viewersCountBar}>
+        <View style={[styles.viewersCountBar, { bottom: insets.bottom > 0 ? insets.bottom + 10 : 24 }]}>
           <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
           <Text style={[typography.caption, { color: '#FFFFFF', marginLeft: 6 }]}>
             {currentStory.viewsCount} Viewers

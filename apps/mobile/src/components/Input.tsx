@@ -43,6 +43,10 @@ export const Input: React.FC<InputProps> = ({
           {
             backgroundColor: colors.surfaceElevated,
             borderColor: error ? colors.error : isFocused ? colors.primary : colors.border,
+            minHeight: 50,
+            height: props.multiline ? undefined : 50,
+            paddingVertical: props.multiline ? spacing.xs : 0,
+            alignItems: props.multiline ? 'flex-start' : 'center',
           },
         ]}
       >
@@ -51,7 +55,7 @@ export const Input: React.FC<InputProps> = ({
             name={leftIcon}
             size={20}
             color={isFocused ? colors.primary : colors.textMuted}
-            style={styles.icon}
+            style={[styles.icon, props.multiline && { marginTop: spacing.xs }]}
           />
         )}
         <TextInput
@@ -59,6 +63,7 @@ export const Input: React.FC<InputProps> = ({
           secureTextEntry={isPassword && !showPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          textAlignVertical={props.multiline ? 'top' : 'center'}
           style={[
             styles.input,
             typography.body1,
@@ -68,7 +73,11 @@ export const Input: React.FC<InputProps> = ({
           {...props}
         />
         {isPassword && (
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.eyeIcon}
+          >
             <Ionicons
               name={showPassword ? 'eye-off' : 'eye'}
               size={20}

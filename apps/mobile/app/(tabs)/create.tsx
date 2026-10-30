@@ -7,6 +7,8 @@ import {
   ScrollView,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -264,164 +266,170 @@ export default function CreateScreen() {
         })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Media Picker (for post, reel, story) */}
-        {activeType !== 'note' && (
-          <View style={{ marginBottom: spacing.md }}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() =>
-                pickMedia(
-                  activeType === 'reel'
-                    ? ImagePicker.MediaTypeOptions.Videos
-                    : ImagePicker.MediaTypeOptions.All
-                )
-              }
-              style={[
-                styles.mediaPlaceholder,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              {selectedMedia ? (
-                <View style={StyleSheet.absoluteFill}>
-                  <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} />
-                  <TouchableOpacity
-                    onPress={() => setSelectedMedia(null)}
-                    style={styles.removeMediaBtn}
-                  >
-                    <Ionicons name="close-circle" size={28} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.placeholderInner}>
-                  <Ionicons
-                    name={activeType === 'reel' ? 'videocam' : 'image'}
-                    size={42}
-                    color={colors.primary}
-                  />
-                  <Text style={[typography.body2, { color: colors.text, marginTop: spacing.sm, fontWeight: '600' }]}>
-                    Tap to select {activeType === 'reel' ? 'video' : 'photo/video'}
-                  </Text>
-                  <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4 }]}>
-                    From your gallery or camera
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Emoji selector for Social Note */}
-        {activeType === 'note' && (
-          <View style={styles.emojiRow}>
-            {['🔥', '✨', '🎧', '⚡', '🌙', '💫', '🖤', '🚀'].map((emoji) => (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {/* Media Picker (for post, reel, story) */}
+          {activeType !== 'note' && (
+            <View style={{ marginBottom: spacing.md }}>
               <TouchableOpacity
-                key={emoji}
-                onPress={() => setSocialNoteEmoji(emoji)}
+                activeOpacity={0.8}
+                onPress={() =>
+                  pickMedia(
+                    activeType === 'reel'
+                      ? ImagePicker.MediaTypeOptions.Videos
+                      : ImagePicker.MediaTypeOptions.All
+                  )
+                }
                 style={[
-                  styles.emojiBtn,
-                  socialNoteEmoji === emoji && {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.primary,
-                    borderWidth: 1.5,
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: 24 }}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Caption / Text Input */}
-        <Input
-          label={activeType === 'note' ? 'Your Status (max 100 chars)' : 'Write a caption...'}
-          placeholder={
-            activeType === 'note'
-              ? "What's on your mind right now?"
-              : 'Add captions and hashtags...'
-          }
-          value={caption}
-          onChangeText={(text) => {
-            setCaption(text);
-            setDraftSaved(false);
-          }}
-          multiline
-          maxLength={activeType === 'note' ? 100 : 2000}
-          style={{ height: 80, textAlignVertical: 'top' }}
-        />
-
-        {/* Quick Hashtag Chips */}
-        {activeType !== 'note' && (
-          <View style={styles.hashtagRow}>
-            {['#mozhi', '#vibes', '#trending', '#chill', '#music', '#lifestyle'].map((tag) => (
-              <TouchableOpacity
-                key={tag}
-                onPress={() => addHashtag(tag)}
-                style={[styles.hashtagChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-              >
-                <Text style={[typography.caption, { color: colors.primary }]}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Audience Selector */}
-        <View style={styles.audienceSection}>
-          <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs, fontWeight: '700' }]}>
-            WHO CAN SEE THIS
-          </Text>
-          <View style={styles.audienceButtonsRow}>
-            {[
-              { id: 'all' as Audience, label: 'Public', icon: 'earth-outline' },
-              { id: 'followers' as Audience, label: 'Followers', icon: 'people-outline' },
-              { id: 'close_friends' as Audience, label: 'Private', icon: 'lock-closed-outline' },
-            ].map((opt) => (
-              <TouchableOpacity
-                key={opt.id}
-                onPress={() => setAudience(opt.id)}
-                style={[
-                  styles.audienceBtn,
+                  styles.mediaPlaceholder,
                   {
-                    backgroundColor: audience === opt.id ? colors.primary : colors.surfaceElevated,
+                    backgroundColor: colors.surfaceElevated,
                     borderColor: colors.border,
                   },
                 ]}
               >
-                <Ionicons
-                  name={opt.icon as any}
-                  size={14}
-                  color={audience === opt.id ? '#FFFFFF' : colors.textSecondary}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
+                {selectedMedia ? (
+                  <View style={StyleSheet.absoluteFill}>
+                    <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} />
+                    <TouchableOpacity
+                      onPress={() => setSelectedMedia(null)}
+                      style={styles.removeMediaBtn}
+                    >
+                      <Ionicons name="close-circle" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.placeholderInner}>
+                    <Ionicons
+                      name={activeType === 'reel' ? 'videocam' : 'image'}
+                      size={42}
+                      color={colors.primary}
+                    />
+                    <Text style={[typography.body2, { color: colors.text, marginTop: spacing.sm, fontWeight: '600' }]}>
+                      Tap to select {activeType === 'reel' ? 'video' : 'photo/video'}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4 }]}>
+                      From your gallery or camera
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Emoji selector for Social Note */}
+          {activeType === 'note' && (
+            <View style={styles.emojiRow}>
+              {['🔥', '✨', '🎧', '⚡', '🌙', '💫', '🖤', '🚀'].map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => setSocialNoteEmoji(emoji)}
                   style={[
-                    typography.caption,
-                    {
-                      color: audience === opt.id ? '#FFFFFF' : colors.textSecondary,
-                      fontWeight: audience === opt.id ? '700' : '500',
+                    styles.emojiBtn,
+                    socialNoteEmoji === emoji && {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.primary,
+                      borderWidth: 1.5,
                     },
                   ]}
                 >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-        {/* Publish Button */}
-        <Button
-          title={isSubmitting ? 'Uploading & Publishing...' : `Publish ${activeType.toUpperCase()}`}
-          onPress={handlePublish}
-          loading={isSubmitting}
-          disabled={isSubmitting}
-          style={{ marginTop: spacing.md }}
-        />
-      </ScrollView>
+          {/* Caption / Text Input */}
+          <Input
+            label={activeType === 'note' ? 'Your Status (max 100 chars)' : 'Write a caption...'}
+            placeholder={
+              activeType === 'note'
+                ? "What's on your mind right now?"
+                : 'Add captions and hashtags...'
+            }
+            value={caption}
+            onChangeText={(text) => {
+              setCaption(text);
+              setDraftSaved(false);
+            }}
+            multiline
+            maxLength={activeType === 'note' ? 100 : 2000}
+            style={{ height: 80, textAlignVertical: 'top' }}
+          />
+
+          {/* Quick Hashtag Chips */}
+          {activeType !== 'note' && (
+            <View style={styles.hashtagRow}>
+              {['#mozhi', '#vibes', '#trending', '#chill', '#music', '#lifestyle'].map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  onPress={() => addHashtag(tag)}
+                  style={[styles.hashtagChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                >
+                  <Text style={[typography.caption, { color: colors.primary }]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Audience Selector */}
+          <View style={styles.audienceSection}>
+            <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs, fontWeight: '700' }]}>
+              WHO CAN SEE THIS
+            </Text>
+            <View style={styles.audienceButtonsRow}>
+              {[
+                { id: 'all' as Audience, label: 'Public', icon: 'earth-outline' },
+                { id: 'followers' as Audience, label: 'Followers', icon: 'people-outline' },
+                { id: 'close_friends' as Audience, label: 'Private', icon: 'lock-closed-outline' },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  onPress={() => setAudience(opt.id)}
+                  style={[
+                    styles.audienceBtn,
+                    {
+                      backgroundColor: audience === opt.id ? colors.primary : colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={opt.icon as any}
+                    size={14}
+                    color={audience === opt.id ? '#FFFFFF' : colors.textSecondary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      typography.caption,
+                      {
+                        color: audience === opt.id ? '#FFFFFF' : colors.textSecondary,
+                        fontWeight: audience === opt.id ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Publish Button */}
+          <Button
+            title={isSubmitting ? 'Uploading & Publishing...' : `Publish ${activeType.toUpperCase()}`}
+            onPress={handlePublish}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            style={{ marginTop: spacing.md }}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -485,7 +493,8 @@ const styles = StyleSheet.create({
   },
   emojiRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: spacing.md,
   },
   emojiBtn: {
@@ -509,13 +518,15 @@ const styles = StyleSheet.create({
   },
   audienceButtonsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   audienceBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
     borderRadius: borderRadius.md,
     borderWidth: 1,
   },
