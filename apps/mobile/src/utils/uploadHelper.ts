@@ -64,3 +64,4 @@ export async function uploadMediaAsset(asset: UploadAssetInput): Promise<string>
     return asset.uri;
   }
 }
+
