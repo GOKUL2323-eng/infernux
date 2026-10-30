@@ -111,6 +111,37 @@ export class UserController {
       next(error);
     }
   }
+
+  async getFollowers(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const limit = parseInt(req.query.limit as string, 10) || 50;
+      const followers = await userService.getFollowers(id, limit);
+      sendSuccess(res, followers);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getFollowing(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const limit = parseInt(req.query.limit as string, 10) || 50;
+      const following = await userService.getFollowing(id, limit);
+      sendSuccess(res, following);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBlockedUsers(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const blocked = await userService.getBlockedUsers(req.userId!);
+      sendSuccess(res, blocked);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const userController = new UserController();

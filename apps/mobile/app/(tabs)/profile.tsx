@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,6 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
+import { EditProfileModal } from '../../src/components/EditProfileModal';
+import { UserListModal } from '../../src/components/UserListModal';
+import { CommentsModal } from '../../src/components/CommentsModal';
 import { api } from '../../src/api/client';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 import { PostSummary, ReelSummary } from '@infernux/shared';
@@ -31,6 +35,16 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('posts');
   const [userPosts, setUserPosts] = useState<PostSummary[]>([]);
   const [userReels, setUserReels] = useState<ReelSummary[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Modals
+  const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+  const [userListModalConfig, setUserListModalConfig] = useState<{
+    visible: boolean;
+    type: 'followers' | 'following';
+    title: string;
+  }>({ visible: false, type: 'followers', title: 'Followers' });
+  const [selectedPostIdForComments, setSelectedPostIdForComments] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -47,6 +61,30 @@ export default function ProfileScreen() {
 
     if (postsRes.success && postsRes.data) setUserPosts(postsRes.data);
     if (reelsRes.success && reelsRes.data) setUserReels(reelsRes.data);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserContent();
+    setRefreshing(false);
+  };
+
+  const openFollowers = () => {
+    if (!user) return;
+    setUserListModalConfig({
+      visible: true,
+      type: 'followers',
+      title: 'Followers',
+    });
+  };
+
+  const openFollowing = () => {
+    if (!user) return;
+    setUserListModalConfig({
+      visible: true,
+      type: 'following',
+      title: 'Following',
+    });
   };
 
   return (
@@ -78,7 +116,12 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
         {/* Cover Image */}
         {user?.coverImageUrl ? (
           <Image source={{ uri: user.coverImageUrl }} style={styles.coverImage} />
@@ -98,14 +141,16 @@ export default function ProfileScreen() {
               <Text style={[typography.h3, { color: colors.text }]}>{userPosts.length}</Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Posts</Text>
             </View>
-            <View style={styles.statItem}>
+
+            <TouchableOpacity onPress={openFollowers} style={styles.statItem}>
               <Text style={[typography.h3, { color: colors.text }]}>{user?.followersCount || 0}</Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Followers</Text>
-            </View>
-            <View style={styles.statItem}>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={openFollowing} style={styles.statItem}>
               <Text style={[typography.h3, { color: colors.text }]}>{user?.followingCount || 0}</Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Following</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -124,7 +169,7 @@ export default function ProfileScreen() {
         {/* Action Buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
-            onPress={() => router.push('/settings' as any)}
+            onPress={() => setIsEditProfileVisible(true)}
             style={[styles.editBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
           >
             <Text style={[typography.button, { color: colors.text, fontSize: 13 }]}>
@@ -171,24 +216,46 @@ export default function ProfileScreen() {
               color={activeTab === 'reels' ? colors.primary : colors.textMuted}
             />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setActiveTab('saved')}
+            style={[
+              styles.tabIconBtn,
+              activeTab === 'saved' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+            ]}
+          >
+            <Ionicons
+              name={activeTab === 'saved' ? 'bookmark' : 'bookmark-outline'}
+              size={22}
+              color={activeTab === 'saved' ? colors.primary : colors.textMuted}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Grid Display */}
         {activeTab === 'posts' ? (
           <View style={styles.grid}>
             {userPosts.map((post) => (
-              <View key={post.id} style={styles.gridCell}>
+              <TouchableOpacity
+                key={post.id}
+                style={styles.gridCell}
+                onPress={() => setSelectedPostIdForComments(post.id)}
+              >
                 <Image
                   source={{ uri: post.media[0]?.url }}
                   style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
                 />
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
-        ) : (
+        ) : activeTab === 'reels' ? (
           <View style={styles.grid}>
             {userReels.map((reel) => (
-              <View key={reel.id} style={styles.gridCell}>
+              <TouchableOpacity
+                key={reel.id}
+                style={styles.gridCell}
+                onPress={() => router.push('/(tabs)/reels' as any)}
+              >
                 <Image
                   source={{ uri: reel.thumbnailUrl }}
                   style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
@@ -197,11 +264,59 @@ export default function ProfileScreen() {
                   <Ionicons name="play" size={14} color="#FFFFFF" />
                   <Text style={styles.reelViews}>{reel.viewsCount}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {userPosts
+              .filter((p) => p.isSaved)
+              .map((post) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={styles.gridCell}
+                  onPress={() => setSelectedPostIdForComments(post.id)}
+                >
+                  <Image
+                    source={{ uri: post.media[0]?.url }}
+                    style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
+                  />
+                </TouchableOpacity>
+              ))}
           </View>
         )}
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      {isEditProfileVisible && (
+        <EditProfileModal
+          visible={isEditProfileVisible}
+          onClose={() => setIsEditProfileVisible(false)}
+          onProfileUpdated={fetchUserContent}
+        />
+      )}
+
+      {/* User List Modal (Followers / Following) */}
+      {userListModalConfig.visible && user && (
+        <UserListModal
+          visible={userListModalConfig.visible}
+          title={userListModalConfig.title}
+          userId={user.id}
+          type={userListModalConfig.type}
+          onClose={() => setUserListModalConfig((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
+
+      {/* Post Comments Modal */}
+      {selectedPostIdForComments && (
+        <CommentsModal
+          visible={!!selectedPostIdForComments}
+          targetType="post"
+          targetId={selectedPostIdForComments}
+          onClose={() => setSelectedPostIdForComments(null)}
+          onCommentAdded={fetchUserContent}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -223,8 +338,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBtn: {
-    marginLeft: spacing.md,
-    padding: spacing.xxs,
+    padding: spacing.xs,
+    marginLeft: spacing.xs,
   },
   coverImage: {
     width: '100%',
@@ -233,27 +348,29 @@ const styles = StyleSheet.create({
   },
   coverFallback: {
     width: '100%',
-    height: 100,
+    height: 120,
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    marginTop: -40,
+    marginTop: -42,
   },
   avatarWrapper: {
     borderWidth: 3,
-    borderRadius: 45,
+    borderRadius: 50,
   },
   statsRow: {
-    flex: 1,
     flexDirection: 'row',
+    flex: 1,
     justifyContent: 'space-around',
     marginLeft: spacing.lg,
-    marginTop: 20,
+    marginTop: 35,
   },
   statItem: {
     alignItems: 'center',
+    padding: spacing.xxs,
   },
   bioSection: {
     paddingHorizontal: spacing.md,
@@ -262,27 +379,28 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
     gap: spacing.sm,
+    marginTop: spacing.md,
   },
   editBtn: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
+    height: 36,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
-  },
-  shareBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderRadius: borderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: borderRadius.md,
+  },
   tabIconsRow: {
     flexDirection: 'row',
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     borderBottomWidth: 0.5,
   },
   tabIconBtn: {
@@ -294,6 +412,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 2,
+    marginTop: 2,
   },
   gridCell: {
     width: GRID_ITEM_SIZE,
@@ -303,6 +422,7 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   reelOverlay: {
     position: 'absolute',
@@ -310,12 +430,15 @@ const styles = StyleSheet.create({
     left: 6,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
   },
   reelViews: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    marginLeft: 4,
+    marginLeft: 3,
   },
 });
-

@@ -300,6 +300,18 @@ export class PostService {
       };
     });
   }
+
+  async deletePost(userId: string, postId: string): Promise<void> {
+    const post = await Post.findById(postId);
+    if (!post) throw new Error('Post not found');
+    if (post.authorId.toString() !== userId) throw new Error('Not authorized to delete this post');
+
+    await Post.findByIdAndDelete(postId);
+    await Comment.deleteMany({ postId });
+    await Like.deleteMany({ targetType: 'post', targetId: postId });
+    await SavedItem.deleteMany({ itemType: 'post', itemId: postId });
+    await User.findByIdAndUpdate(userId, { $inc: { postsCount: -1 } });
+  }
 }
 
 export const postService = new PostService();

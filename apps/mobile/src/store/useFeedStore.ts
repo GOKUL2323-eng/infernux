@@ -22,6 +22,7 @@ interface FeedState {
   likePost: (postId: string) => Promise<void>;
   savePost: (postId: string) => Promise<void>;
   likeReel: (reelId: string) => Promise<void>;
+  saveReel: (reelId: string) => Promise<void>;
   setActiveReelIndex: (index: number) => void;
 }
 
@@ -112,6 +113,19 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     }));
 
     await api.post(`/reels/${reelId}/like`);
+  },
+
+  saveReel: async (reelId: string) => {
+    set((state) => ({
+      reels: state.reels.map((r) => {
+        if (r.id === reelId) {
+          return { ...r, isSaved: !r.isSaved };
+        }
+        return r;
+      }),
+    }));
+
+    await api.post(`/reels/${reelId}/save`);
   },
 
   setActiveReelIndex: (index: number) => {

@@ -26,6 +26,9 @@ interface ChatState {
   setUserTyping: (conversationId: string, username: string, isTyping: boolean) => void;
   createRoom: (input: CreateRoomInput) => Promise<RoomDetails | null>;
   joinRoomByKey: (secretKey: string) => Promise<{ room: RoomDetails; conversationId: string } | null>;
+  deleteMessage: (messageId: string, conversationId: string) => Promise<boolean>;
+  addReaction: (messageId: string, conversationId: string, emoji: string) => Promise<boolean>;
+  editMessage: (messageId: string, conversationId: string, content: string) => Promise<boolean>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -153,6 +156,59 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return res.data;
     }
     return null;
+  },
+
+  deleteMessage: async (messageId: string, conversationId: string) => {
+    const res = await api.delete(`/chats/messages/${messageId}`);
+    if (res.success) {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [conversationId]: (state.messages[conversationId] || []).filter((m) => m.id !== messageId),
+        },
+      }));
+      return true;
+    }
+    return false;
+  },
+
+  addReaction: async (messageId: string, conversationId: string, emoji: string) => {
+    const res = await api.post(`/chats/messages/${messageId}/reactions`, { emoji });
+    if (res.success) {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [conversationId]: (state.messages[conversationId] || []).map((m) => {
+            if (m.id === messageId) {
+              const existingReactions = m.reactions || [];
+              return {
+                ...m,
+                reactions: [...existingReactions, { userId: 'me', emoji, createdAt: new Date().toISOString() }],
+              };
+            }
+            return m;
+          }),
+        },
+      }));
+      return true;
+    }
+    return false;
+  },
+
+  editMessage: async (messageId: string, conversationId: string, content: string) => {
+    const res = await api.patch<MessageSummary>(`/chats/messages/${messageId}`, { content });
+    if (res.success && res.data) {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [conversationId]: (state.messages[conversationId] || []).map((m) =>
+            m.id === messageId ? { ...m, content, isEdited: true } : m
+          ),
+        },
+      }));
+      return true;
+    }
+    return false;
   },
 }));
 

@@ -25,6 +25,15 @@ router.patch('/notifications', authenticate, validateBody(updateNotificationsSch
 router.get('/search', optionalAuthenticate, (req, res, next) =>
   userController.searchUsers(req, res, next)
 );
+router.get('/blocked', authenticate, (req, res, next) =>
+  userController.getBlockedUsers(req, res, next)
+);
+router.get('/:id/followers', optionalAuthenticate, (req, res, next) =>
+  userController.getFollowers(req, res, next)
+);
+router.get('/:id/following', optionalAuthenticate, (req, res, next) =>
+  userController.getFollowing(req, res, next)
+);
 router.post('/:id/follow', authenticate, (req, res, next) =>
   userController.followUser(req, res, next)
 );

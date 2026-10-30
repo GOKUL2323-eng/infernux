@@ -22,6 +22,7 @@ export default function SearchScreen() {
 
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async (text: string) => {
@@ -40,29 +41,78 @@ export default function SearchScreen() {
     }
   };
 
-  const renderUserItem = ({ item }: { item: UserSummary }) => (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => router.push(`/(tabs)/profile` as any)}
-      style={[styles.userRow, { borderBottomColor: colors.border }]}
-    >
-      <Avatar url={item.avatarUrl} name={item.displayName} size={46} isVerified={item.isVerified} />
-      <View style={styles.userInfo}>
-        <Text style={[typography.body1, { color: colors.text, fontWeight: '700' }]}>
-          {item.displayName}
-        </Text>
-        <Text style={[typography.caption, { color: colors.textSecondary }]}>
-          @{item.username}
-        </Text>
-      </View>
+  const handleToggleFollow = async (userItem: UserSummary) => {
+    const isFollowing = followingIds.has(userItem.id);
+    if (isFollowing) {
+      setFollowingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userItem.id);
+        return next;
+      });
+      await api.delete(`/users/${userItem.id}/unfollow`);
+    } else {
+      setFollowingIds((prev) => new Set(prev).add(userItem.id));
+      await api.post(`/users/${userItem.id}/follow`);
+    }
+  };
+
+  const handleOpenDirectChat = async (targetUser: UserSummary) => {
+    const res = await api.post('/chats/conversations', {
+      type: 'direct',
+      recipientId: targetUser.id,
+    });
+    if (res.success && res.data) {
+      const convId = (res.data as any).conversationId;
+      router.push(`/chat/${convId}` as any);
+    }
+  };
+
+  const renderUserItem = ({ item }: { item: UserSummary }) => {
+    const isFollowing = followingIds.has(item.id);
+
+    return (
       <TouchableOpacity
-        onPress={() => api.post(`/users/${item.id}/follow`)}
-        style={[styles.followBtn, { backgroundColor: colors.primary }]}
+        activeOpacity={0.7}
+        onPress={() => router.push(`/(tabs)/profile` as any)}
+        style={[styles.userRow, { borderBottomColor: colors.border }]}
       >
-        <Text style={[typography.button, { color: '#FFFFFF', fontSize: 12 }]}>Follow</Text>
+        <Avatar url={item.avatarUrl} name={item.displayName} size={46} isVerified={item.isVerified} />
+        <View style={styles.userInfo}>
+          <Text style={[typography.body1, { color: colors.text, fontWeight: '700' }]}>
+            {item.displayName}
+          </Text>
+          <Text style={[typography.caption, { color: colors.textSecondary }]}>
+            @{item.username}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => handleOpenDirectChat(item)}
+          style={[styles.chatBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleToggleFollow(item)}
+          style={[
+            styles.followBtn,
+            { backgroundColor: isFollowing ? colors.surfaceElevated : colors.primary },
+            isFollowing && { borderWidth: 1, borderColor: colors.border },
+          ]}
+        >
+          <Text
+            style={[
+              typography.button,
+              { color: isFollowing ? colors.text : '#FFFFFF', fontSize: 12 },
+            ]}
+          >
+            {isFollowing ? 'Following' : 'Follow'}
+          </Text>
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -149,6 +199,12 @@ const styles = StyleSheet.create({
   userInfo: {
     flex: 1,
     marginLeft: spacing.md,
+  },
+  chatBtn: {
+    padding: 8,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    marginRight: spacing.sm,
   },
   followBtn: {
     paddingVertical: 6,

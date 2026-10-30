@@ -55,6 +55,37 @@ export class ReelController {
       next(error);
     }
   }
+
+  async getComments(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const limit = parseInt(req.query.limit as string, 10) || 50;
+      const comments = await reelService.getComments(id, limit);
+      sendSuccess(res, comments);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addComment(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const comment = await reelService.addComment(req.userId!, id, req.body.content);
+      sendSuccess(res, comment, 'Comment added successfully', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async saveReel(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const saved = await reelService.toggleSaveReel(req.userId!, id);
+      sendSuccess(res, { saved }, saved ? 'Reel saved' : 'Reel unsaved');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const reelController = new ReelController();

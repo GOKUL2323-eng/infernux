@@ -241,6 +241,63 @@ export class UserService {
       lastSeen: u.lastSeen?.toISOString(),
     }));
   }
+
+  async getFollowers(userId: string, limit = 50): Promise<UserSummary[]> {
+    const follows = await Follow.find({ followingId: userId, status: 'accepted' })
+      .populate('followerId', '_id username displayName avatarUrl isVerified isOnline lastSeen')
+      .limit(limit);
+
+    return follows
+      .map((f) => f.followerId as any)
+      .filter(Boolean)
+      .map((u) => ({
+        id: u._id.toString(),
+        username: u.username,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        isVerified: u.isVerified,
+        isOnline: u.isOnline,
+        lastSeen: u.lastSeen?.toISOString(),
+      }));
+  }
+
+  async getFollowing(userId: string, limit = 50): Promise<UserSummary[]> {
+    const follows = await Follow.find({ followerId: userId, status: 'accepted' })
+      .populate('followingId', '_id username displayName avatarUrl isVerified isOnline lastSeen')
+      .limit(limit);
+
+    return follows
+      .map((f) => f.followingId as any)
+      .filter(Boolean)
+      .map((u) => ({
+        id: u._id.toString(),
+        username: u.username,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        isVerified: u.isVerified,
+        isOnline: u.isOnline,
+        lastSeen: u.lastSeen?.toISOString(),
+      }));
+  }
+
+  async getBlockedUsers(userId: string): Promise<UserSummary[]> {
+    const blocks = await Block.find({ blockerId: userId })
+      .populate('blockedId', '_id username displayName avatarUrl isVerified isOnline lastSeen')
+      .limit(50);
+
+    return blocks
+      .map((b) => b.blockedId as any)
+      .filter(Boolean)
+      .map((u) => ({
+        id: u._id.toString(),
+        username: u.username,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        isVerified: u.isVerified,
+        isOnline: u.isOnline,
+        lastSeen: u.lastSeen?.toISOString(),
+      }));
+  }
 }
 
 export const userService = new UserService();

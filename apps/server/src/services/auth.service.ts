@@ -11,6 +11,7 @@ import {
   AuthTokens,
   AuthResponse,
   UserProfile,
+  ChangePasswordInput,
 } from '@infernux/shared';
 
 export class AuthService {
@@ -158,6 +159,21 @@ export class AuthService {
   async deleteAccount(userId: string): Promise<void> {
     await Session.deleteMany({ userId });
     await User.findByIdAndDelete(userId);
+  }
+
+  async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    const isMatch = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new Error('Current password is incorrect');
+    }
+    const salt = await bcrypt.genSalt(12);
+    user.passwordHash = await bcrypt.hash(input.newPassword, salt);
+    await user.save();
+    await Session.updateMany({ userId }, { $set: { isRevoked: true } });
   }
 }
 

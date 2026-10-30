@@ -13,6 +13,7 @@ interface PostCardProps {
   onSave: () => void;
   onShare: () => void;
   onUserPress: () => void;
+  onOptionsPress?: () => void;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -22,6 +23,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   onSave,
   onShare,
   onUserPress,
+  onOptionsPress,
 }) => {
   const { colors } = useThemeStore();
   const primaryMedia = post.media && post.media.length > 0 ? post.media[0] : null;
@@ -41,7 +43,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={onOptionsPress} style={{ padding: spacing.xs }}>
           <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Reel, IReelDocument } from '../models/Reel';
+import { ReelComment } from '../models/ReelComment';
 import { Like } from '../models/Like';
 import { SavedItem } from '../models/SavedItem';
 import { Follow } from '../models/Follow';
@@ -217,6 +218,74 @@ export class ReelService {
         createdAt: r.createdAt.toISOString(),
       };
     });
+  }
+
+  async getComments(reelId: string, limit = 50): Promise<any[]> {
+    const comments = await ReelComment.find({ reelId })
+      .populate('authorId', 'username displayName avatarUrl isVerified')
+      .sort({ createdAt: 1 })
+      .limit(limit);
+
+    return comments.map((c) => {
+      const author = c.authorId as any;
+      return {
+        id: c._id.toString(),
+        reelId,
+        authorId: author ? author._id.toString() : '',
+        author: {
+          id: author ? author._id.toString() : '',
+          username: author?.username || '',
+          displayName: author?.displayName || '',
+          avatarUrl: author?.avatarUrl,
+          isVerified: author?.isVerified,
+        },
+        content: c.content,
+        likesCount: c.likesCount,
+        createdAt: c.createdAt.toISOString(),
+      };
+    });
+  }
+
+  async addComment(userId: string, reelId: string, content: string): Promise<any> {
+    const reel = await Reel.findById(reelId);
+    if (!reel) throw new Error('Reel not found');
+
+    const comment = new ReelComment({
+      reelId,
+      authorId: userId,
+      content,
+    });
+    await comment.save();
+
+    await Reel.findByIdAndUpdate(reelId, { $inc: { commentsCount: 1 } });
+    const author = await User.findById(userId).select('username displayName avatarUrl isVerified');
+
+    return {
+      id: comment._id.toString(),
+      reelId,
+      authorId: userId,
+      author: {
+        id: userId,
+        username: author?.username || '',
+        displayName: author?.displayName || '',
+        avatarUrl: author?.avatarUrl,
+        isVerified: author?.isVerified,
+      },
+      content: comment.content,
+      likesCount: 0,
+      createdAt: comment.createdAt.toISOString(),
+    };
+  }
+
+  async toggleSaveReel(userId: string, reelId: string): Promise<boolean> {
+    const existing = await SavedItem.findOne({ userId, itemType: 'reel', itemId: reelId });
+    if (existing) {
+      await SavedItem.findByIdAndDelete(existing._id);
+      return false;
+    } else {
+      await SavedItem.create({ userId, itemType: 'reel', itemId: reelId });
+      return true;
+    }
   }
 }
 

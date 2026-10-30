@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -92,6 +93,37 @@ export default function StoryViewerScreen() {
     }
   };
 
+  const handleQuickReaction = async (emoji: string) => {
+    if (!userGroup) return;
+    const res = await api.post('/chats/conversations', {
+      type: 'direct',
+      recipientId: userGroup.user.id,
+    });
+    if (res.success && res.data) {
+      const convId = (res.data as any).conversationId;
+      await api.post(`/chats/conversations/${convId}/messages`, {
+        content: `Reacted ${emoji} to your story`,
+        contentType: 'text',
+      });
+      Alert.alert('Reaction Sent', `Sent ${emoji} to @${userGroup.user.username}`);
+    }
+  };
+
+  const handleDeleteStory = () => {
+    if (!currentStory) return;
+    Alert.alert('Delete Story', 'Are you sure you want to delete this story?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await api.delete(`/stories/${currentStory.id}`);
+          router.back();
+        },
+      },
+    ]);
+  };
+
   if (!currentStory) {
     return (
       <View style={[styles.container, { backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }]}>
@@ -149,9 +181,16 @@ export default function StoryViewerScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-          <Ionicons name="close" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {currentStory.creatorId === user?.id && (
+            <TouchableOpacity onPress={handleDeleteStory} style={styles.deleteStoryBtn}>
+              <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+            <Ionicons name="close" size={26} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Caption overlay if present */}
@@ -163,21 +202,36 @@ export default function StoryViewerScreen() {
         </View>
       ) : null}
 
-      {/* Bottom Reply Bar */}
+      {/* Bottom Section */}
       {currentStory.creatorId !== user?.id ? (
-        <View style={styles.bottomBar}>
-          <TextInput
-            placeholder={`Reply to ${currentStory.creator?.username}...`}
-            placeholderTextColor="rgba(255,255,255,0.6)"
-            value={replyText}
-            onChangeText={setReplyText}
-            style={styles.replyInput}
-          />
-          {replyText.trim().length > 0 && (
-            <TouchableOpacity onPress={handleSendReply} style={styles.sendReplyBtn}>
-              <Ionicons name="send" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
+        <View style={styles.bottomContainer}>
+          {/* Quick Reaction Emojis */}
+          <View style={styles.quickEmojisRow}>
+            {['❤️', '🔥', '😂', '😮', '👏'].map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                onPress={() => handleQuickReaction(emoji)}
+                style={styles.quickEmojiBtn}
+              >
+                <Text style={{ fontSize: 24 }}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.bottomBar}>
+            <TextInput
+              placeholder={`Reply to ${currentStory.creator?.username}...`}
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={replyText}
+              onChangeText={setReplyText}
+              style={styles.replyInput}
+            />
+            {replyText.trim().length > 0 && (
+              <TouchableOpacity onPress={handleSendReply} style={styles.sendReplyBtn}>
+                <Ionicons name="send" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : (
         <View style={styles.viewersCountBar}>
@@ -246,9 +300,34 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: spacing.xs,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteStoryBtn: {
+    padding: spacing.xs,
+    marginRight: spacing.xs,
+  },
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 24,
+    left: spacing.md,
+    right: spacing.md,
+  },
+  quickEmojisRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  quickEmojiBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+  },
   captionOverlay: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 140,
     left: spacing.xl,
     right: spacing.xl,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -256,10 +335,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 24,
-    left: spacing.md,
-    right: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
   },
