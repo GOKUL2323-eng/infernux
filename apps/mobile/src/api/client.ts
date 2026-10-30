@@ -1,15 +1,34 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { ApiResponse } from '@infernux/shared';
 
-// For physical device testing, use machine IP or tunnel; default localhost for simulator/web
-const DEV_API_URL = Platform.select({
-  android: 'http://10.0.2.2:4000/api/v1',
-  ios: 'http://localhost:4000/api/v1',
-  default: 'http://localhost:4000/api/v1',
-});
+function resolveApiBaseUrl(): string {
+  if (Platform.OS === 'web') {
+    return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  }
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEV_API_URL;
+  // On physical device in Expo Go, dynamically detect development machine IP from Metro debugger host
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:4000/api/v1`;
+    }
+  }
+
+  if (process.env.EXPO_PUBLIC_LAN_API_URL) {
+    return process.env.EXPO_PUBLIC_LAN_API_URL;
+  }
+
+  // Fallback for emulators
+  return Platform.select({
+    android: 'http://10.0.2.2:4000/api/v1',
+    default: 'http://localhost:4000/api/v1',
+  });
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const ACCESS_TOKEN_KEY = 'infernux_access_token';
 const REFRESH_TOKEN_KEY = 'infernux_refresh_token';
