@@ -8,9 +8,47 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  const statusCode = err.statusCode || err.status || 500;
-  const message = err.message || 'Internal Server Error';
-  const code = err.code || 'SERVER_ERROR';
+  let statusCode = err.statusCode || err.status || 500;
+  let message = err.message || 'Internal Server Error';
+  let code = err.code || 'SERVER_ERROR';
+
+  const msgLower = (message || '').toLowerCase();
+  if (
+    msgLower.includes('already exists') ||
+    msgLower.includes('already taken') ||
+    msgLower.includes('duplicate') ||
+    err.code === 11000
+  ) {
+    statusCode = 409;
+    code = 'CONFLICT';
+  } else if (
+    msgLower.includes('invalid credentials') ||
+    msgLower.includes('incorrect password') ||
+    msgLower.includes('unauthorized') ||
+    msgLower.includes('token')
+  ) {
+    statusCode = 401;
+    code = 'UNAUTHORIZED';
+  } else if (
+    msgLower.includes('access denied') ||
+    msgLower.includes('permission denied') ||
+    msgLower.includes('not permitted') ||
+    msgLower.includes('only the creator') ||
+    msgLower.includes('only the owner')
+  ) {
+    statusCode = 403;
+    code = 'FORBIDDEN';
+  } else if (
+    msgLower.includes('not found') ||
+    msgLower.includes('invalid room invitation key') ||
+    msgLower.includes('room invitation key expired')
+  ) {
+    statusCode = 404;
+    code = 'NOT_FOUND';
+  } else if (msgLower.includes('validation')) {
+    statusCode = 422;
+    code = 'VALIDATION_ERROR';
+  }
 
   logger.error(
     `[${req.method}] ${req.url} - Error: ${message}`,

@@ -33,11 +33,31 @@ export class CallController {
     }
   }
 
+  async acceptCall(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const session = await callService.respondToCall(id, req.userId!, { action: 'accept' });
+      sendSuccess(res, session, 'Call accepted');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async rejectCall(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const session = await callService.respondToCall(id, req.userId!, { action: 'reject' });
+      sendSuccess(res, session, 'Call rejected');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async endCall(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = getParam(req.params.id);
-      await callService.endCall(id, req.userId!, req.body);
-      sendSuccess(res, null, 'Call ended');
+      await callService.endCall(id, req.userId!, req.body || {});
+      sendSuccess(res, { status: 'ended' }, 'Call ended');
     } catch (error) {
       next(error);
     }

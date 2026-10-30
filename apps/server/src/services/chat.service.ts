@@ -135,14 +135,15 @@ export class ChatService {
         contentType: m.contentType,
         content: m.isDeleted ? 'This message was deleted' : m.content,
         attachments: m.isDeleted ? [] : m.attachments,
-        replyTo: m.replyTo
-          ? {
-              id: m.replyTo.id.toString(),
-              senderDisplayName: m.replyTo.senderDisplayName,
-              content: m.replyTo.content,
-              contentType: m.replyTo.contentType,
-            }
-          : undefined,
+        replyTo:
+          m.replyTo && m.replyTo.id
+            ? {
+                id: m.replyTo.id.toString(),
+                senderDisplayName: m.replyTo.senderDisplayName,
+                content: m.replyTo.content,
+                contentType: m.replyTo.contentType,
+              }
+            : undefined,
         reactions: m.reactions.map((r: any) => ({
           userId: r.userId?._id?.toString() || r.userId?.toString(),
           emoji: r.emoji,
@@ -236,14 +237,15 @@ export class ChatService {
       contentType: message.contentType,
       content: message.content,
       attachments: message.attachments,
-      replyTo: message.replyTo
-        ? {
-            id: message.replyTo.id.toString(),
-            senderDisplayName: message.replyTo.senderDisplayName,
-            content: message.replyTo.content,
-            contentType: message.replyTo.contentType,
-          }
-        : undefined,
+      replyTo:
+        message.replyTo && message.replyTo.id
+          ? {
+              id: message.replyTo.id.toString(),
+              senderDisplayName: message.replyTo.senderDisplayName,
+              content: message.replyTo.content,
+              contentType: message.replyTo.contentType,
+            }
+          : undefined,
       reactions: [],
       receipts: [{ userId: senderId, status: 'sent', updatedAt: message.createdAt.toISOString() }],
       isEdited: false,

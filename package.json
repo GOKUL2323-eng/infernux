@@ -15,6 +15,7 @@
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "node scripts/run-e2e-audit.cjs",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

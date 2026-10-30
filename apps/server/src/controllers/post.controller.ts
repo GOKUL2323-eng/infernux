@@ -61,7 +61,7 @@ export class PostController {
     try {
       const id = getParam(req.params.id);
       const isSaved = await postService.toggleSavePost(req.userId!, id);
-      sendSuccess(res, { isSaved }, isSaved ? 'Post saved' : 'Post unsaved');
+      sendSuccess(res, { isSaved, saved: isSaved }, isSaved ? 'Post saved' : 'Post unsaved');
     } catch (error) {
       next(error);
     }

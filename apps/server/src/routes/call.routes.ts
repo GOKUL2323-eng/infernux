@@ -19,7 +19,13 @@ router.get('/:id/token', (req, res, next) => callController.getCallToken(req, re
 router.post('/:id/respond', validateBody(respondCallSchema), (req, res, next) =>
   callController.respondToCall(req, res, next)
 );
-router.post('/:id/end', validateBody(endCallSchema), (req, res, next) =>
+router.post('/:id/accept', (req, res, next) =>
+  callController.acceptCall(req, res, next)
+);
+router.post('/:id/reject', (req, res, next) =>
+  callController.rejectCall(req, res, next)
+);
+router.post('/:id/end', (req, res, next) =>
   callController.endCall(req, res, next)
 );
 router.get('/history', (req, res, next) => callController.getCallHistory(req, res, next));
