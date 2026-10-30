@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -29,7 +30,7 @@ type ProfileTab = 'posts' | 'reels' | 'saved';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, logout, deleteAccount } = useAuthStore();
   const { colors } = useThemeStore();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>('posts');
@@ -45,6 +46,38 @@ export default function ProfileScreen() {
     title: string;
   }>({ visible: false, type: 'followers', title: 'Followers' });
   const [selectedPostIdForComments, setSelectedPostIdForComments] = useState<string | null>(null);
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out of MOZHI?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/auth/login' as any);
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your profile, posts, rooms, and conversations. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAccount();
+            router.replace('/auth/login' as any);
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (user) {
@@ -112,6 +145,12 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings' as any)}
           >
             <Ionicons name="settings-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleSignOut}
+          >
+            <Ionicons name="log-out-outline" size={22} color={colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -183,6 +222,15 @@ export default function ProfileScreen() {
             <Ionicons name="key" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={[typography.button, { color: '#FFFFFF', fontSize: 13 }]}>
               New Room
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSignOut}
+            style={[styles.logoutBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+          >
+            <Ionicons name="log-out-outline" size={14} color={colors.error} style={{ marginRight: 4 }} />
+            <Text style={[typography.button, { color: colors.error, fontSize: 13 }]}>
+              Sign Out
             </Text>
           </TouchableOpacity>
         </View>
@@ -397,6 +445,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 36,
     borderRadius: borderRadius.md,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
   },
   tabIconsRow: {
     flexDirection: 'row',

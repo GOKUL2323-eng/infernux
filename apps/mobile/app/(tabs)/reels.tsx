@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../src/store/useFeedStore';
+import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
 import { CommentsModal } from '../../src/components/CommentsModal';
@@ -87,6 +88,7 @@ function ReelVideo({
 
 export default function ReelsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const { reels, loadReels, likeReel, saveReel, activeReelIndex, setActiveReelIndex } = useFeedStore();
   const { colors } = useThemeStore();
   const [paused, setPaused] = useState(false);
@@ -95,7 +97,7 @@ export default function ReelsScreen() {
 
   useEffect(() => {
     loadReels();
-  }, []);
+  }, [user?.id]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {

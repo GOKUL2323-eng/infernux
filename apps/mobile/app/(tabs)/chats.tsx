@@ -35,7 +35,7 @@ export default function ChatsScreen() {
   useEffect(() => {
     loadConversations();
     fetchCallHistory();
-  }, []);
+  }, [user?.id]);
 
   const fetchCallHistory = async () => {
     const res = await api.get<CallSession[]>('/calls/history?limit=30');

@@ -43,9 +43,9 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'following'>('all');
 
   useEffect(() => {
-    loadFeed();
+    loadFeed(true);
     loadStories();
-  }, []);
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);

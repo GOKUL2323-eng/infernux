@@ -38,25 +38,29 @@ export class AuthService {
   }
 
   async register(input: RegisterInput, ipAddress?: string, userAgent?: string): Promise<AuthResponse> {
+    const username = input.username.toLowerCase().trim();
+    const email = (input.email || `${username}@mozhi.app`).toLowerCase().trim();
+    const displayName = (input.displayName || input.username).trim();
+
     const existingUser = await User.findOne({
-      $or: [{ email: input.email.toLowerCase() }, { username: input.username.toLowerCase() }],
+      $or: [{ email }, { username }],
     });
 
     if (existingUser) {
-      if (existingUser.email === input.email.toLowerCase()) {
-        throw new Error('An account with this email already exists');
+      if (existingUser.username === username) {
+        throw new Error('Username is already taken');
       }
-      throw new Error('Username is already taken');
+      throw new Error('An account with this email already exists');
     }
 
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(input.password, salt);
 
     const user = new User({
-      username: input.username.toLowerCase(),
-      email: input.email.toLowerCase(),
+      username,
+      email,
       passwordHash,
-      displayName: input.displayName,
+      displayName,
       phoneNumber: input.phoneNumber,
     });
 
@@ -81,9 +85,14 @@ export class AuthService {
   }
 
   async login(input: LoginInput, ipAddress?: string, userAgent?: string): Promise<AuthResponse> {
-    const identifier = input.loginIdentifier.toLowerCase();
+    const rawIdentifier = input.loginIdentifier.trim();
+    const identifier = rawIdentifier.toLowerCase();
     const user = await User.findOne({
-      $or: [{ email: identifier }, { username: identifier }],
+      $or: [
+        { email: identifier },
+        { username: identifier },
+        { phoneNumber: rawIdentifier },
+      ],
     });
 
     if (!user) {

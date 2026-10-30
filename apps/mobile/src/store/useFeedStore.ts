@@ -24,6 +24,7 @@ interface FeedState {
   likeReel: (reelId: string) => Promise<void>;
   saveReel: (reelId: string) => Promise<void>;
   setActiveReelIndex: (index: number) => void;
+  reset: () => void;
 }
 
 export const useFeedStore = create<FeedState>((set, get) => ({
@@ -34,6 +35,18 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   isLoadingReels: false,
   isLoadingStories: false,
   activeReelIndex: 0,
+
+  reset: () => {
+    set({
+      posts: [],
+      reels: [],
+      stories: [],
+      isLoadingPosts: false,
+      isLoadingReels: false,
+      isLoadingStories: false,
+      activeReelIndex: 0,
+    });
+  },
 
   loadFeed: async (refresh = false) => {
     if (refresh) set({ isLoadingPosts: true });

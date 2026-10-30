@@ -8,7 +8,25 @@ function resolveApiBaseUrl(): string {
     return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
   }
 
-  // On physical device in Expo Go, dynamically detect development machine IP from Metro debugger host
+  // 1. Check debuggerHost from Expo Go
+  const debuggerHost = (Constants as any).expoGoConfig?.debuggerHost || (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;
+  if (debuggerHost) {
+    const host = debuggerHost.split(':')[0];
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:4000/api/v1`;
+    }
+  }
+
+  // 2. Check experienceUrl (e.g. exp://192.168.1.10:8081)
+  const expUrl = (Constants as any).experienceUrl;
+  if (typeof expUrl === 'string') {
+    const match = expUrl.match(/:\/\/([^:/]+)/);
+    if (match && match[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
+      return `http://${match[1]}:4000/api/v1`;
+    }
+  }
+
+  // 3. Check hostUri
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const host = hostUri.split(':')[0];
@@ -17,15 +35,12 @@ function resolveApiBaseUrl(): string {
     }
   }
 
+  // 4. Fallback to configured LAN URL or default LAN host
   if (process.env.EXPO_PUBLIC_LAN_API_URL) {
     return process.env.EXPO_PUBLIC_LAN_API_URL;
   }
 
-  // Fallback for emulators
-  return Platform.select({
-    android: 'http://10.0.2.2:4000/api/v1',
-    default: 'http://localhost:4000/api/v1',
-  });
+  return 'http://192.168.1.10:4000/api/v1';
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
@@ -100,6 +115,42 @@ export async function clearAuthTokens(): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+const LAST_ACCOUNT_KEY = 'infernux_last_account';
+
+export interface SavedAccountInfo {
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+export async function saveLastAccount(account: SavedAccountInfo): Promise<void> {
+  try {
+    const raw = JSON.stringify(account);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(LAST_ACCOUNT_KEY, raw);
+    } else if (Platform.OS !== 'web') {
+      await SecureStore.setItemAsync(LAST_ACCOUNT_KEY, raw);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export async function getLastAccount(): Promise<SavedAccountInfo | null> {
+  try {
+    let raw: string | null = null;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      raw = window.localStorage.getItem(LAST_ACCOUNT_KEY);
+    } else if (Platform.OS !== 'web') {
+      raw = await SecureStore.getItemAsync(LAST_ACCOUNT_KEY);
+    }
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 async function request<T>(

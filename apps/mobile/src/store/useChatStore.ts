@@ -29,6 +29,7 @@ interface ChatState {
   deleteMessage: (messageId: string, conversationId: string) => Promise<boolean>;
   addReaction: (messageId: string, conversationId: string, emoji: string) => Promise<boolean>;
   editMessage: (messageId: string, conversationId: string, content: string) => Promise<boolean>;
+  reset: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -37,6 +38,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeConversationId: null,
   typingUsers: {},
   isLoading: false,
+
+  reset: () => {
+    set({
+      conversations: [],
+      messages: {},
+      activeConversationId: null,
+      typingUsers: {},
+      isLoading: false,
+    });
+  },
 
   loadConversations: async () => {
     set({ isLoading: true });

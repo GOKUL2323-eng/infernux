@@ -29,22 +29,23 @@ export default function RegisterScreen() {
   const [validationError, setValidationError] = useState('');
 
   const handleRegister = async () => {
-    if (!displayName.trim() || !username.trim() || !email.trim() || !password.trim()) {
-      setValidationError('Please fill in all fields');
+    if (!username.trim() || !password.trim()) {
+      setValidationError('Please enter a username and password');
       return;
     }
 
-    if (password.length < 8) {
-      setValidationError('Password must be at least 8 characters with upper, lower, & digit');
+    if (password.length < 4) {
+      setValidationError('Password must be at least 4 characters');
       return;
     }
 
     setValidationError('');
 
+    const trimmedUsername = username.trim().toLowerCase();
     const success = await register({
-      displayName: displayName.trim(),
-      username: username.trim(),
-      email: email.trim(),
+      displayName: displayName.trim() || username.trim(),
+      username: trimmedUsername,
+      email: email.trim() || `${trimmedUsername}@mozhi.app`,
       password,
     });
 
@@ -82,16 +83,8 @@ export default function RegisterScreen() {
 
         <View style={styles.form}>
           <Input
-            label="Full Name / Display Name"
-            placeholder="e.g. Alex Morgan"
-            value={displayName}
-            onChangeText={setDisplayName}
-            leftIcon="person-outline"
-          />
-
-          <Input
-            label="Username"
-            placeholder="e.g. alex_morgan"
+            label="Username *"
+            placeholder="e.g. alex or my_name"
             value={username}
             onChangeText={setUsername}
             leftIcon="at-outline"
@@ -99,22 +92,30 @@ export default function RegisterScreen() {
           />
 
           <Input
-            label="Email Address"
+            label="Password *"
+            placeholder="Min 4 characters"
+            value={password}
+            onChangeText={setPassword}
+            leftIcon="lock-closed-outline"
+            isPassword
+          />
+
+          <Input
+            label="Display Name (Optional)"
+            placeholder="e.g. Alex Morgan"
+            value={displayName}
+            onChangeText={setDisplayName}
+            leftIcon="person-outline"
+          />
+
+          <Input
+            label="Email Address (Optional)"
             placeholder="e.g. alex@example.com"
             value={email}
             onChangeText={setEmail}
             leftIcon="mail-outline"
             autoCapitalize="none"
             keyboardType="email-address"
-          />
-
-          <Input
-            label="Password"
-            placeholder="Min 8 chars, 1 uppercase, 1 digit"
-            value={password}
-            onChangeText={setPassword}
-            leftIcon="lock-closed-outline"
-            isPassword
           />
 
           <Button

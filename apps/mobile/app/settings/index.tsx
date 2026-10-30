@@ -27,7 +27,7 @@ import { UserSummary } from '@infernux/shared';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, logout, updateUser, deleteAccount } = useAuthStore();
   const { isDarkMode, toggleTheme, colors } = useThemeStore();
 
   const [isPrivate, setIsPrivate] = useState(user?.privacy?.isPrivate || false);
@@ -160,8 +160,7 @@ export default function SettingsScreen() {
           text: 'Delete Forever',
           style: 'destructive',
           onPress: async () => {
-            await api.delete('/auth/account');
-            await logout();
+            await deleteAccount();
             router.replace('/auth/login' as any);
           },
         },

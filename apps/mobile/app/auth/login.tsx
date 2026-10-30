@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
+import { getLastAccount, SavedAccountInfo } from '../../src/api/client';
 import { spacing, typography } from '../../src/theme/spacing';
 
 export default function LoginScreen() {
@@ -25,6 +26,18 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [savedAccount, setSavedAccount] = useState<SavedAccountInfo | null>(null);
+
+  useEffect(() => {
+    getLastAccount().then((acc) => {
+      if (acc) {
+        setSavedAccount(acc);
+        if (!identifier) {
+          setIdentifier(acc.username);
+        }
+      }
+    });
+  }, []);
 
   const handleLogin = async () => {
     if (!identifier.trim() || !password.trim()) {
@@ -39,6 +52,28 @@ export default function LoginScreen() {
     });
 
     if (success) {
+      router.replace('/' as any);
+    }
+  };
+
+  const handleQuickDemoLogin = async () => {
+    setValidationError('');
+    const success = await login({
+      loginIdentifier: 'demo_user',
+      password: 'DemoPassword123!',
+    });
+    if (success) {
+      router.replace('/' as any);
+      return;
+    }
+
+    const regSuccess = await useAuthStore.getState().register({
+      username: 'demo_user',
+      displayName: 'Demo User',
+      email: 'demo_user@mozhi.app',
+      password: 'DemoPassword123!',
+    });
+    if (regSuccess) {
       router.replace('/' as any);
     }
   };
@@ -70,6 +105,24 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
+        {savedAccount ? (
+          <TouchableOpacity
+            style={[styles.savedAccountBanner, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            onPress={() => setIdentifier(savedAccount.username)}
+          >
+            <Ionicons name="person-circle" size={32} color={colors.primary} />
+            <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+              <Text style={[typography.body2, { color: colors.text, fontWeight: '700' }]}>
+                {savedAccount.displayName || savedAccount.username}
+              </Text>
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                Tap to re-login as @{savedAccount.username}
+              </Text>
+            </View>
+            <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.form}>
           <Input
             label="Username or Email"
@@ -92,6 +145,14 @@ export default function LoginScreen() {
           <Button
             title="Sign In"
             onPress={handleLogin}
+            loading={isLoading}
+            style={{ marginTop: spacing.sm }}
+          />
+
+          <Button
+            title="⚡ One-Tap Demo Sign In"
+            variant="secondary"
+            onPress={handleQuickDemoLogin}
             loading={isLoading}
             style={{ marginTop: spacing.sm }}
           />
@@ -141,6 +202,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  savedAccountBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
