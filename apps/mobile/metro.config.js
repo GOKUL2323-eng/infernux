@@ -6,13 +6,15 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch shared monorepo packages and root node_modules only (prevents watching apps/server and git)
+// Limit workers on Windows to prevent worker thread exhaustion
+config.maxWorkers = 2;
+
+// Only watch local packages for changes, never watch entire node_modules tree
 config.watchFolders = [
   path.resolve(workspaceRoot, 'packages'),
-  path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// Let Metro resolve packages in both mobile node_modules and root node_modules
+// Let Metro resolve packages from both mobile and root node_modules
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
