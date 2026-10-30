@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "mozhi",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D0D12"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mozhi.app",
@@ -59,6 +54,14 @@
         {
           "photosPermission": "Allow MOZHI to access your photos",
           "savePhotosPermission": "Allow MOZHI to save photos"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0D0D12"
         }
       ]
     ],
