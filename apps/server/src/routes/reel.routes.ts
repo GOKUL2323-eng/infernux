@@ -21,6 +21,9 @@ router.post('/:id/save', authenticate, (req, res, next) =>
 router.post('/:id/view', optionalAuthenticate, (req, res, next) =>
   reelController.recordView(req, res, next)
 );
+router.post('/:id/share', optionalAuthenticate, (req, res, next) =>
+  reelController.recordShare(req, res, next)
+);
 router.get('/:id/comments', optionalAuthenticate, (req, res, next) =>
   reelController.getComments(req, res, next)
 );

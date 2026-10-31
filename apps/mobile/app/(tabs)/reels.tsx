@@ -1,306 +1,153 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
-  Dimensions,
   StyleSheet,
   TouchableOpacity,
-  Image,
-  Share,
-  Alert,
+  AppState,
+  AppStateStatus,
+  RefreshControl,
 } from 'react-native';
-
-interface ViewToken {
-  item: any;
-  key: string;
-  index: number | null;
-  isViewable: boolean;
-}
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../src/store/useFeedStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { useThemeStore } from '../../src/store/useThemeStore';
-import { Avatar } from '../../src/components/Avatar';
-import { CommentsModal } from '../../src/components/CommentsModal';
-import { api } from '../../src/api/client';
+import { ReelVideoItem } from '../../src/components/reels/ReelVideoItem';
+import { ReelsTopNav } from '../../src/components/reels/ReelsTopNav';
+import { ReelsCommentsSheet } from '../../src/components/reels/ReelsCommentsSheet';
+import { ReelsShareSheet } from '../../src/components/reels/ReelsShareSheet';
+import { ReelsOptionsSheet } from '../../src/components/reels/ReelsOptionsSheet';
+import { ReelUploadModal } from '../../src/components/reels/ReelUploadModal';
 import { spacing, typography } from '../../src/theme/spacing';
 import { ReelSummary } from '@infernux/shared';
-
-function ReelVideo({
-  videoUrl,
-  thumbnailUrl,
-  isActive,
-  paused,
-  isMuted,
-}: {
-  videoUrl: string;
-  thumbnailUrl?: string;
-  isActive: boolean;
-  paused: boolean;
-  isMuted: boolean;
-}) {
-  const player = useVideoPlayer(videoUrl, (p) => {
-    p.loop = true;
-    p.muted = isMuted;
-    if (isActive && !paused) {
-      p.play();
-    }
-  });
-
-  useEffect(() => {
-    player.muted = isMuted;
-  }, [isMuted, player]);
-
-  useEffect(() => {
-    if (isActive && !paused) {
-      player.play();
-    } else {
-      player.pause();
-    }
-  }, [isActive, paused, player]);
-
-  if (!isActive) {
-    return (
-      <Image
-        source={{ uri: thumbnailUrl || videoUrl }}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-      />
-    );
-  }
-
-  return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      nativeControls={false}
-    />
-  );
-}
 
 export default function ReelsScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { reels, loadReels, likeReel, saveReel, activeReelIndex, setActiveReelIndex } = useFeedStore();
-  const { colors } = useThemeStore();
-  const [paused, setPaused] = useState(false);
+  const {
+    reels,
+    loadReels,
+    isLoadingReels,
+    activeReelIndex,
+    setActiveReelIndex,
+    reelFeedType,
+    setReelFeedType,
+  } = useFeedStore();
+
   const [isMuted, setIsMuted] = useState(false);
-  const [commentsModalReelId, setCommentsModalReelId] = useState<string | null>(null);
+  const [isAppActive, setIsAppActive] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Dynamic reel height taking tab bar height and top safe area into account
+  // Modal states
+  const [commentsReelId, setCommentsReelId] = useState<string | null>(null);
+  const [shareReel, setShareReel] = useState<ReelSummary | null>(null);
+  const [optionsReel, setOptionsReel] = useState<ReelSummary | null>(null);
+  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
+
+  // Dynamic reel height: video spans from y=0 (behind transparent top nav) to bottom tab bar
   const bottomTabBarHeight = 56 + (insets.bottom > 0 ? insets.bottom : 8);
-  const reelHeight = height - bottomTabBarHeight - insets.top;
+  const reelHeight = height - bottomTabBarHeight;
 
+  // Initial load
   useEffect(() => {
     loadReels();
   }, [user?.id]);
 
+  // AppState listener to pause playback when app is backgrounded
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      setIsAppActive(nextAppState === 'active');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) {
       setActiveReelIndex(viewableItems[0].index);
-      setPaused(false);
     }
   }).current;
 
-  const handleShareReel = async (reel: ReelSummary) => {
-    try {
-      const shareUrl = `https://mozhi.app/reel/${reel.id}`;
-      await Share.share({
-        message: reel.caption ? `${reel.caption}\n${shareUrl}` : `Watch this reel on MOZHI: ${shareUrl}`,
-      });
-    } catch {
-      // ignore
-    }
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadReels(true);
+    setRefreshing(false);
   };
 
-  const handleReelOptions = (reel: ReelSummary) => {
-    Alert.alert('Reel Options', `@${reel.creator.username}`, [
-      {
-        text: 'Share Reel',
-        onPress: () => handleShareReel(reel),
-      },
-      {
-        text: reel.isSaved ? 'Remove from Saved' : 'Save Reel',
-        onPress: () => saveReel(reel.id),
-      },
-      {
-        text: 'Report Inappropriate',
-        onPress: async () => {
-          await api.post('/moderation/reports', {
-            targetType: 'reel',
-            targetId: reel.id,
-            reason: 'Inappropriate or harmful content',
-          });
-          Alert.alert('Report Received', 'Thank you for keeping MOZHI safe. Our moderation team has been notified.');
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+  const handleToggleMute = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
 
-  const handleFollowToggle = async (creatorId: string, isFollowing?: boolean) => {
-    if (isFollowing) {
-      await api.delete(`/users/${creatorId}/unfollow`);
-    } else {
-      await api.post(`/users/${creatorId}/follow`);
-    }
-    loadReels();
-  };
+  const handleOpenComments = useCallback((reelId: string) => {
+    setCommentsReelId(reelId);
+  }, []);
 
-  const renderReelItem = ({ item, index }: { item: ReelSummary; index: number }) => {
-    const isActive = index === activeReelIndex;
+  const handleOpenShare = useCallback((reel: ReelSummary) => {
+    setShareReel(reel);
+  }, []);
 
-    return (
-      <View style={[styles.reelContainer, { width, height: reelHeight, backgroundColor: '#000000' }]}>
-        {/* Video Player */}
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setPaused(!paused)}
-          style={StyleSheet.absoluteFill}
-        >
-          <ReelVideo
-            videoUrl={item.videoUrl}
-            thumbnailUrl={item.thumbnailUrl}
-            isActive={isActive}
-            paused={paused}
-            isMuted={isMuted}
-          />
+  const handleOpenOptions = useCallback((reel: ReelSummary) => {
+    setOptionsReel(reel);
+  }, []);
 
-          {paused && (
-            <View style={styles.pauseOverlay}>
-              <View style={styles.pauseCircle}>
-                <Ionicons name="play" size={48} color="rgba(255,255,255,0.9)" />
-              </View>
-            </View>
-          )}
-        </TouchableOpacity>
+  const handleOpenMusic = useCallback(() => {
+    router.push('/music' as any);
+  }, [router]);
 
-        {/* Volume Mute Toggle Floating Button */}
-        <TouchableOpacity
-          onPress={() => setIsMuted(!isMuted)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.volumeBtn}
-        >
-          <Ionicons
-            name={isMuted ? 'volume-mute' : 'volume-high'}
-            size={18}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+  const renderReelItem = useCallback(
+    ({ item, index }: { item: ReelSummary; index: number }) => {
+      const isActive = index === activeReelIndex;
 
-        {/* Right Floating Actions */}
-        <View style={[styles.rightActions, { bottom: insets.bottom > 0 ? insets.bottom + 16 : 80 }]}>
-          <TouchableOpacity
-            style={styles.creatorAvatarWrapper}
-            onPress={() => handleFollowToggle(item.creatorId, item.isFollowingCreator)}
-          >
-            <Avatar url={item.creator.avatarUrl} name={item.creator.displayName} size={46} isVerified={item.creator.isVerified} />
-            {!item.isFollowingCreator && (
-              <View style={[styles.followPlus, { backgroundColor: colors.primary }]}>
-                <Ionicons name="add" size={14} color="#FFFFFF" />
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => likeReel(item.id)}
-          >
-            <Ionicons
-              name={item.isLiked ? 'heart' : 'heart-outline'}
-              size={32}
-              color={item.isLiked ? colors.error : '#FFFFFF'}
-            />
-            <Text style={styles.actionText}>{item.likesCount}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => setCommentsModalReelId(item.id)}
-          >
-            <Ionicons name="chatbubble-outline" size={28} color="#FFFFFF" />
-            <Text style={styles.actionText}>{item.commentsCount}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => handleShareReel(item)}
-          >
-            <Ionicons name="paper-plane-outline" size={28} color="#FFFFFF" />
-            <Text style={styles.actionText}>{item.sharesCount}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => saveReel(item.id)}
-          >
-            <Ionicons
-              name={item.isSaved ? 'bookmark' : 'bookmark-outline'}
-              size={28}
-              color={item.isSaved ? colors.primary : '#FFFFFF'}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => handleReelOptions(item)}
-          >
-            <Ionicons name="ellipsis-horizontal" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {/* Audio Spinning Disc */}
-          <TouchableOpacity
-            style={styles.audioDisc}
-            onPress={() => router.push('/music' as any)}
-          >
-            <Ionicons name="disc" size={26} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Details Overlay */}
-        <View style={[styles.bottomOverlay, { paddingBottom: insets.bottom > 0 ? insets.bottom + 12 : spacing.lg }]}>
-          <TouchableOpacity onPress={() => router.push('/search' as any)}>
-            <Text style={[typography.body1, styles.creatorName]}>
-              @{item.creator.username}
-            </Text>
-          </TouchableOpacity>
-          {item.caption ? (
-            <Text numberOfLines={2} style={[typography.body2, styles.captionText]}>
-              {item.caption}
-            </Text>
-          ) : null}
-
-          {item.audio && (
-            <TouchableOpacity
-              style={styles.audioRow}
-              onPress={() => router.push('/music' as any)}
-            >
-              <Ionicons name="musical-notes" size={14} color="#FFFFFF" />
-              <Text numberOfLines={1} style={styles.audioText}>
-                {item.audio.title} • {item.audio.artist}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  };
+      return (
+        <ReelVideoItem
+          item={item}
+          index={index}
+          isActive={isActive}
+          reelHeight={reelHeight}
+          reelWidth={width}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+          onOpenComments={handleOpenComments}
+          onOpenShare={handleOpenShare}
+          onOpenOptions={handleOpenOptions}
+          onOpenMusic={handleOpenMusic}
+          isAppActive={isAppActive}
+        />
+      );
+    },
+    [
+      activeReelIndex,
+      reelHeight,
+      width,
+      isMuted,
+      handleToggleMute,
+      handleOpenComments,
+      handleOpenShare,
+      handleOpenOptions,
+      handleOpenMusic,
+      isAppActive,
+    ]
+  );
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: '#000000' }]}>
+    <View style={[styles.container, { backgroundColor: '#000000' }]}>
+      <StatusBar style="light" />
+
+      {/* Transparent Top Navigation Overlay (Instagram Style) */}
+      <ReelsTopNav
+        onOpenCreateReel={() => setIsUploadModalVisible(true)}
+        onOpenSearch={() => router.push('/search' as any)}
+      />
+
+      {/* Fullscreen Vertical Swipe FlatList */}
       <FlatList
         data={reels}
         keyExtractor={(item) => item.id}
@@ -311,136 +158,141 @@ export default function ReelsScreen() {
         snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 65 }}
+        windowSize={3}
+        maxToRenderPerBatch={2}
+        initialNumToRender={2}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#FFFFFF"
+            colors={['#6366F1']}
+            progressViewOffset={insets.top + 50}
+          />
+        }
         ListEmptyComponent={
-          <View style={[styles.emptyContainer, { height: reelHeight }]}>
-            <Ionicons name="videocam-outline" size={60} color="#666" />
-            <Text style={[typography.h3, { color: '#FFF', marginTop: spacing.md }]}>
-              No Reels Found
+          <View style={[styles.emptyContainer, { height: reelHeight, width }]}>
+            <Ionicons name="videocam-outline" size={68} color="#555" />
+            <Text style={[typography.h3, styles.emptyTitle]}>
+              {reelFeedType === 'following' ? 'No Following Reels' : 'No Reels Yet'}
             </Text>
-            <Text style={[typography.body2, { color: '#AAA', textAlign: 'center', marginTop: spacing.xs }]}>
-              Tap Create to publish the first vertical video!
+            <Text style={styles.emptySubtitle}>
+              {reelFeedType === 'following'
+                ? "Follow more creators to see their vertical videos here, or switch to 'For You'."
+                : 'Be the first to create and share a vertical video with the world!'}
             </Text>
+
+            <View style={styles.emptyActionsRow}>
+              {reelFeedType === 'following' ? (
+                <TouchableOpacity
+                  style={styles.emptyPrimaryBtn}
+                  onPress={() => setReelFeedType('for_you')}
+                >
+                  <Text style={styles.emptyPrimaryBtnText}>Explore For You</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={[styles.emptyPrimaryBtn, { backgroundColor: '#6366F1' }]}
+                onPress={() => setIsUploadModalVisible(true)}
+              >
+                <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.emptyPrimaryBtnText}>Create Reel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         }
       />
 
-      {/* Comments Modal for Reels */}
-      {commentsModalReelId && (
-        <CommentsModal
-          visible={!!commentsModalReelId}
-          targetType="reel"
-          targetId={commentsModalReelId}
-          onClose={() => setCommentsModalReelId(null)}
+      {/* Instagram-Style Comment Bottom Sheet */}
+      {commentsReelId && (
+        <ReelsCommentsSheet
+          visible={!!commentsReelId}
+          reelId={commentsReelId}
+          onClose={() => setCommentsReelId(null)}
           onCommentAdded={() => loadReels()}
         />
       )}
-    </SafeAreaView>
+
+      {/* Instagram-Style Share Bottom Sheet */}
+      {shareReel && (
+        <ReelsShareSheet
+          visible={!!shareReel}
+          reel={shareReel}
+          onClose={() => setShareReel(null)}
+        />
+      )}
+
+      {/* Reels Options Sheet */}
+      {optionsReel && (
+        <ReelsOptionsSheet
+          visible={!!optionsReel}
+          reel={optionsReel}
+          onClose={() => setOptionsReel(null)}
+          onNotInterested={(id) => {
+            // Remove from local feed
+            useFeedStore.setState((state) => ({
+              reels: state.reels.filter((r) => r.id !== id),
+            }));
+          }}
+        />
+      )}
+
+      {/* 8-Step Instagram-Inspired Reel Upload Modal */}
+      <ReelUploadModal
+        visible={isUploadModalVisible}
+        onClose={() => setIsUploadModalVisible(false)}
+        onPublished={() => loadReels(true)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  reelContainer: {
-    position: 'relative',
-    justifyContent: 'flex-end',
-  },
-  pauseOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  pauseCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 4,
-  },
-  volumeBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  rightActions: {
-    position: 'absolute',
-    right: spacing.md,
-    alignItems: 'center',
-  },
-  creatorAvatarWrapper: {
-    position: 'relative',
-    marginBottom: spacing.lg,
-  },
-  followPlus: {
-    position: 'absolute',
-    bottom: -6,
-    alignSelf: 'center',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtn: {
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  actionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  audioDisc: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#1E1E28',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    marginTop: spacing.xs,
-  },
-  bottomOverlay: {
-    paddingHorizontal: spacing.md,
-    paddingRight: 76,
-    width: '100%',
-  },
-  creatorName: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    marginBottom: spacing.xxs,
-  },
-  captionText: {
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: spacing.xs,
-  },
-  audioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  audioText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginLeft: spacing.xs,
+    backgroundColor: '#000000',
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: '#0D0D14',
+  },
+  emptyTitle: {
+    color: '#FFFFFF',
+    marginTop: spacing.md,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    fontSize: 13.5,
+    lineHeight: 20,
+    maxWidth: 290,
+  },
+  emptyActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: spacing.lg,
+  },
+  emptyPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#262638',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#3D3D52',
+  },
+  emptyPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13.5,
   },
 });

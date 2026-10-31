@@ -61,7 +61,8 @@ export class ReelService {
   async getReelsFeed(
     userId?: string,
     limit = 15,
-    beforeCursor?: string
+    beforeCursor?: string,
+    options?: { feedType?: 'for_you' | 'following'; query?: string; hashtag?: string }
   ): Promise<PaginatedResponse<ReelSummary>> {
     const query: any = {};
     if (beforeCursor) {
@@ -69,6 +70,26 @@ export class ReelService {
       if (cursorReel) {
         query.createdAt = { $lt: cursorReel.createdAt };
       }
+    }
+
+    // Filter by Following feed if requested
+    if (options?.feedType === 'following' && userId) {
+      const userFollows = await Follow.find({
+        followerId: userId,
+        status: 'accepted',
+      }).select('followingId');
+      const followingCreatorIds = userFollows.map((f) => f.followingId);
+      query.creatorId = { $in: followingCreatorIds };
+    }
+
+    // Filter by hashtag
+    if (options?.hashtag) {
+      query.hashtags = options.hashtag.toLowerCase().replace(/^#/, '');
+    }
+
+    // Search query on caption
+    if (options?.query && options.query.trim()) {
+      query.caption = { $regex: options.query.trim(), $options: 'i' };
     }
 
     const reels = await Reel.find(query)
@@ -286,6 +307,11 @@ export class ReelService {
       await SavedItem.create({ userId, itemType: 'reel', itemId: reelId });
       return true;
     }
+  }
+
+  async recordShare(reelId: string): Promise<number> {
+    const reel = await Reel.findByIdAndUpdate(reelId, { $inc: { sharesCount: 1 } }, { new: true });
+    return reel?.sharesCount || 0;
   }
 }
 

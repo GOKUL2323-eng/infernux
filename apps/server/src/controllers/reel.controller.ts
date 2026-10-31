@@ -17,8 +17,15 @@ export class ReelController {
     try {
       const limit = parseInt(req.query.limit as string, 10) || 15;
       const beforeCursor = req.query.beforeCursor as string | undefined;
+      const feedType = req.query.feedType as 'for_you' | 'following' | undefined;
+      const query = req.query.query as string | undefined;
+      const hashtag = req.query.hashtag as string | undefined;
 
-      const result = await reelService.getReelsFeed(req.userId, limit, beforeCursor);
+      const result = await reelService.getReelsFeed(req.userId, limit, beforeCursor, {
+        feedType,
+        query,
+        hashtag,
+      });
       sendSuccess(res, result);
     } catch (error) {
       next(error);
@@ -82,6 +89,16 @@ export class ReelController {
       const id = getParam(req.params.id);
       const saved = await reelService.toggleSaveReel(req.userId!, id);
       sendSuccess(res, { saved }, saved ? 'Reel saved' : 'Reel unsaved');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async recordShare(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const sharesCount = await reelService.recordShare(id);
+      sendSuccess(res, { sharesCount }, 'Share recorded');
     } catch (error) {
       next(error);
     }
