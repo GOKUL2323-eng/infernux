@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
+  TextInput,
   StyleSheet,
   RefreshControl,
+  ScrollView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatStore } from '../../src/store/useChatStore';
@@ -23,6 +26,7 @@ type ChatTab = 'direct' | 'rooms' | 'calls';
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { colors } = useThemeStore();
   const { conversations, loadConversations, isLoading } = useChatStore();
@@ -31,6 +35,7 @@ export default function ChatsScreen() {
   const [activeTab, setActiveTab] = useState<ChatTab>('direct');
   const [callHistory, setCallHistory] = useState<CallSession[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadConversations();
@@ -51,60 +56,191 @@ export default function ChatsScreen() {
   };
 
   // Filter conversations
-  const directConversations = conversations.filter((c) => c.type === 'direct');
-  const roomConversations = conversations.filter((c) => c.type === 'room' || c.type === 'group');
+  const directConversations = useMemo(() => {
+    return conversations
+      .filter((c) => c.type === 'direct')
+      .filter((c) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        const titleMatch = c.title?.toLowerCase().includes(q);
+        const lastMsgMatch = c.lastMessage?.content?.toLowerCase().includes(q);
+        const userMatch = c.participants?.some(
+          (p) => p.username.toLowerCase().includes(q) || p.displayName.toLowerCase().includes(q)
+        );
+        return titleMatch || lastMsgMatch || userMatch;
+      });
+  }, [conversations, searchQuery]);
+
+  const roomConversations = useMemo(() => {
+    return conversations
+      .filter((c) => c.type === 'room' || c.type === 'group')
+      .filter((c) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        const titleMatch = c.title?.toLowerCase().includes(q);
+        const lastMsgMatch = c.lastMessage?.content?.toLowerCase().includes(q);
+        return titleMatch || lastMsgMatch;
+      });
+  }, [conversations, searchQuery]);
+
+  const filteredCallHistory = useMemo(() => {
+    return callHistory.filter((c) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const otherUser = c.initiatorId === user?.id ? c.recipient : c.initiator;
+      return (
+        otherUser?.displayName?.toLowerCase().includes(q) ||
+        otherUser?.username?.toLowerCase().includes(q)
+      );
+    });
+  }, [callHistory, searchQuery, user?.id]);
+
+  // Extract online & recent conversation partners for the Instagram-style active tray
+  const activeContacts = useMemo(() => {
+    const map = new Map<string, { id: string; username: string; displayName: string; avatarUrl?: string; isOnline?: boolean }>();
+    conversations.forEach((c) => {
+      c.participants?.forEach((p) => {
+        if (p.id !== user?.id && !map.has(p.id)) {
+          map.set(p.id, p);
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [conversations, user?.id]);
+
+  const formatMessageTime = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) {
+      const diffMins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+      return `${diffMins}m`;
+    }
+    if (diffHours < 24) {
+      return `${diffHours}h`;
+    }
+    if (diffHours < 168) {
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d`;
+    }
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const renderActiveContactItem = (contact: { id: string; username: string; displayName: string; avatarUrl?: string; isOnline?: boolean }) => {
+    // Find conversation with this contact
+    const conv = conversations.find(
+      (c) => c.type === 'direct' && c.participants.some((p) => p.id === contact.id)
+    );
+
+    return (
+      <TouchableOpacity
+        key={contact.id}
+        style={styles.activeContactItem}
+        activeOpacity={0.8}
+        onPress={() => {
+          if (conv) {
+            router.push(`/chat/${conv.id}` as any);
+          } else {
+            router.push('/search' as any);
+          }
+        }}
+      >
+        <View style={styles.activeAvatarWrapper}>
+          <Avatar
+            url={contact.avatarUrl}
+            name={contact.displayName || contact.username}
+            size={56}
+            isOnline={contact.isOnline}
+          />
+        </View>
+        <Text numberOfLines={1} style={[styles.activeContactName, { color: colors.text }]}>
+          {contact.displayName ? contact.displayName.split(' ')[0] : contact.username}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderConversationItem = ({ item }: { item: ConversationSummary }) => {
     const lastMsg = item.lastMessage;
     const isUnread = item.unreadCount > 0;
+    const isOnline = item.participants.some((p) => p.id !== user?.id && p.isOnline);
+    const otherParticipant = item.participants.find((p) => p.id !== user?.id);
+    const isRoom = item.type === 'room' || item.type === 'group';
 
     return (
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => router.push(`/chat/${item.id}` as any)}
-        style={[styles.chatItem, { borderBottomColor: colors.border }]}
+        style={[
+          styles.chatRow,
+          { borderBottomColor: colors.border },
+          isUnread && { backgroundColor: colors.surfaceElevated + '40' },
+        ]}
       >
-        <Avatar
-          url={item.avatarUrl}
-          name={item.title || 'Chat'}
-          size={52}
-          isOnline={item.participants.some((p) => p.id !== user?.id && p.isOnline)}
-        />
-        <View style={styles.chatInfo}>
-          <View style={styles.chatTitleRow}>
+        {/* Profile Avatar */}
+        <View style={styles.avatarContainer}>
+          <Avatar
+            url={item.avatarUrl || otherParticipant?.avatarUrl}
+            name={item.title || otherParticipant?.displayName || 'Chat'}
+            size={54}
+            isOnline={isOnline}
+            isVerified={otherParticipant?.isVerified}
+          />
+          {isRoom && (
+            <View style={[styles.roomTypeBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="shield-checkmark" size={10} color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+
+        {/* Conversation Details */}
+        <View style={styles.chatDetails}>
+          <View style={styles.nameRow}>
             <Text
               numberOfLines={1}
               style={[
-                typography.body1,
-                { color: colors.text, fontWeight: isUnread ? '700' : '600', flex: 1 },
+                styles.titleText,
+                { color: colors.text, fontWeight: isUnread ? '700' : '600' },
               ]}
             >
-              {item.title || 'Conversation'}
+              {item.title || otherParticipant?.displayName || otherParticipant?.username || 'Conversation'}
             </Text>
+
             {lastMsg && (
-              <Text style={[typography.caption, { color: colors.textMuted, marginLeft: spacing.xs }]}>
-                {new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <Text style={[styles.timeText, { color: isUnread ? colors.primary : colors.textMuted }]}>
+                {formatMessageTime(lastMsg.createdAt)}
               </Text>
             )}
           </View>
 
-          <View style={styles.chatBottomRow}>
+          <View style={styles.messagePreviewRow}>
             <Text
               numberOfLines={1}
               style={[
-                typography.body2,
+                styles.previewText,
                 {
                   color: isUnread ? colors.text : colors.textSecondary,
-                  fontWeight: isUnread ? '600' : '400',
-                  flex: 1,
+                  fontWeight: isUnread ? '700' : '400',
                 },
               ]}
             >
-              {lastMsg ? lastMsg.content : 'No messages yet'}
+              {lastMsg
+                ? lastMsg.senderId === user?.id
+                  ? `You: ${lastMsg.content}`
+                  : lastMsg.content
+                : isRoom
+                ? 'Protected room conversation'
+                : 'Tap to start chatting'}
             </Text>
+
             {isUnread && (
               <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.unreadCountText}>{item.unreadCount}</Text>
+                <Text style={styles.unreadCountText}>
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
               </View>
             )}
           </View>
@@ -118,22 +254,22 @@ export default function ChatsScreen() {
     const otherUser = isOutgoing ? item.recipient : item.initiator;
 
     return (
-      <View style={[styles.chatItem, { borderBottomColor: colors.border }]}>
-        <Avatar url={otherUser?.avatarUrl} name={otherUser?.displayName || 'User'} size={48} />
-        <View style={styles.chatInfo}>
-          <Text style={[typography.body1, { color: colors.text, fontWeight: '600' }]}>
-            {otherUser?.displayName || otherUser?.username || 'MOZHI User'}
+      <View style={[styles.chatRow, { borderBottomColor: colors.border }]}>
+        <Avatar url={otherUser?.avatarUrl} name={otherUser?.displayName || 'User'} size={52} />
+        <View style={styles.chatDetails}>
+          <Text numberOfLines={1} style={[styles.titleText, { color: colors.text, fontWeight: '600' }]}>
+            {otherUser?.displayName || otherUser?.username || 'MOZHI Contact'}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+          <View style={styles.callMetaRow}>
             <Ionicons
               name={
-                isOutgoing
+                item.status === 'missed'
+                  ? 'arrow-down-outline'
+                  : isOutgoing
                   ? 'arrow-up-outline'
-                  : item.status === 'missed'
-                  ? 'close-outline'
                   : 'arrow-down-outline'
               }
-              size={14}
+              size={13}
               color={
                 item.status === 'missed'
                   ? colors.error
@@ -144,29 +280,30 @@ export default function ChatsScreen() {
             />
             <Text
               style={[
-                typography.caption,
+                styles.callMetaText,
                 {
                   color: item.status === 'missed' ? colors.error : colors.textSecondary,
-                  marginLeft: 4,
                 },
               ]}
             >
-              {item.status.toUpperCase()} • {item.callType === 'video' ? 'Video' : 'Voice'}
+              {item.status === 'missed' ? 'Missed' : isOutgoing ? 'Outgoing' : 'Incoming'} •{' '}
+              {item.callType === 'video' ? 'Video' : 'Voice'}
               {item.duration ? ` • ${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : ''}
             </Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={[styles.callActionBtn, { backgroundColor: colors.surfaceElevated }]}
+          style={[styles.callActionPill, { backgroundColor: colors.surfaceElevated }]}
           onPress={async () => {
             const call = await initiateCall(item.callType, otherUser?.id);
             if (call) router.push(`/call/${call.id}` as any);
           }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons
             name={item.callType === 'video' ? 'videocam' : 'call'}
-            size={20}
+            size={18}
             color={colors.primary}
           />
         </TouchableOpacity>
@@ -176,30 +313,94 @@ export default function ChatsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Header */}
+      {/* 1. Instagram-Inspired Top Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text numberOfLines={1} style={[typography.h2, { color: colors.text, flex: 1 }]}>
-          Messages & Rooms
-        </Text>
+        <View style={styles.headerLeft}>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text }]}>
+            {user?.username ? `@${user.username}` : 'Messages'}
+          </Text>
+        </View>
+
         <View style={styles.headerRight}>
+          {/* Join via Key icon */}
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={styles.headerActionBtn}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             onPress={() => router.push('/room/join' as any)}
           >
             <Ionicons name="key-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
+
+          {/* Create Room icon */}
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={styles.headerActionBtn}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             onPress={() => router.push('/room/create' as any)}
           >
             <Ionicons name="add-circle-outline" size={24} color={colors.text} />
           </TouchableOpacity>
+
+          {/* New message / Search user icon */}
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            onPress={() => router.push('/search' as any)}
+          >
+            <Ionicons name="create-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Segmented Sub-Tabs */}
+      {/* 2. Instagram-Style Rounded Search Field */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceElevated }]}>
+        <Ionicons name="search" size={17} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search direct messages, rooms, and calls..."
+          placeholderTextColor={colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 3. Online Friends / Active Contacts Horizontal Tray */}
+      {activeContacts.length > 0 && (
+        <View style={styles.activeTrayContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.activeTrayContent}
+          >
+            {/* User's own "Your note" bubble */}
+            <TouchableOpacity
+              style={styles.activeContactItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/(tabs)/create' as any)}
+            >
+              <View style={styles.activeAvatarWrapper}>
+                <Avatar url={user?.avatarUrl} name={user?.displayName || 'You'} size={56} />
+                <View style={[styles.addNoteBadge, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="add" size={12} color="#FFFFFF" />
+                </View>
+              </View>
+              <Text numberOfLines={1} style={[styles.activeContactName, { color: colors.textSecondary }]}>
+                Your note
+              </Text>
+            </TouchableOpacity>
+
+            {/* Other contacts */}
+            {activeContacts.map(renderActiveContactItem)}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* 4. Segmented Sub-Tabs (Direct, Rooms, Calls) */}
       <View style={[styles.tabsRow, { backgroundColor: colors.surfaceElevated }]}>
         <TouchableOpacity
           onPress={() => setActiveTab('direct')}
@@ -207,13 +408,11 @@ export default function ChatsScreen() {
         >
           <Text
             numberOfLines={1}
-            ellipsizeMode="tail"
             style={[
-              typography.caption,
+              styles.tabBtnText,
               {
                 color: activeTab === 'direct' ? colors.primary : colors.textSecondary,
-                fontWeight: activeTab === 'direct' ? '700' : '500',
-                fontSize: 11,
+                fontWeight: activeTab === 'direct' ? '700' : '600',
               },
             ]}
           >
@@ -227,13 +426,11 @@ export default function ChatsScreen() {
         >
           <Text
             numberOfLines={1}
-            ellipsizeMode="tail"
             style={[
-              typography.caption,
+              styles.tabBtnText,
               {
                 color: activeTab === 'rooms' ? colors.primary : colors.textSecondary,
-                fontWeight: activeTab === 'rooms' ? '700' : '500',
-                fontSize: 11,
+                fontWeight: activeTab === 'rooms' ? '700' : '600',
               },
             ]}
           >
@@ -247,13 +444,11 @@ export default function ChatsScreen() {
         >
           <Text
             numberOfLines={1}
-            ellipsizeMode="tail"
             style={[
-              typography.caption,
+              styles.tabBtnText,
               {
                 color: activeTab === 'calls' ? colors.primary : colors.textSecondary,
-                fontWeight: activeTab === 'calls' ? '700' : '500',
-                fontSize: 11,
+                fontWeight: activeTab === 'calls' ? '700' : '600',
               },
             ]}
           >
@@ -262,12 +457,14 @@ export default function ChatsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Content List */}
+      {/* 5. Conversation Lists */}
       {activeTab === 'calls' ? (
         <FlatList
-          data={callHistory}
+          data={filteredCallHistory}
           keyExtractor={(item) => item.id}
           renderItem={renderCallItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
@@ -277,7 +474,7 @@ export default function ChatsScreen() {
               <Text style={[typography.h3, { color: colors.text, marginTop: spacing.md }]}>
                 No Call History
               </Text>
-              <Text style={[typography.body2, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+              <Text style={[typography.body2, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>
                 Start high-definition WebRTC voice or video calls with any friend!
               </Text>
             </View>
@@ -288,26 +485,30 @@ export default function ChatsScreen() {
           data={roomConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversationItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={styles.roomActionsBar}>
               <TouchableOpacity
                 onPress={() => router.push('/room/create' as any)}
-                style={[styles.roomActionCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                style={[
+                  styles.roomActionCard,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                ]}
               >
-                <Ionicons name="add-circle" size={24} color={colors.primary} />
-                <Text style={[typography.body2, { color: colors.text, fontWeight: '700', marginLeft: 8 }]}>
-                  Create Room
-                </Text>
+                <Ionicons name="add-circle" size={22} color={colors.primary} />
+                <Text style={[styles.roomActionText, { color: colors.text }]}>Create Room</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => router.push('/room/join' as any)}
-                style={[styles.roomActionCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                style={[
+                  styles.roomActionCard,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                ]}
               >
-                <Ionicons name="key" size={20} color={colors.secondary} />
-                <Text style={[typography.body2, { color: colors.text, fontWeight: '700', marginLeft: 8 }]}>
-                  Join via Key
-                </Text>
+                <Ionicons name="key" size={19} color={colors.secondary} />
+                <Text style={[styles.roomActionText, { color: colors.text }]}>Join via Key</Text>
               </TouchableOpacity>
             </View>
           }
@@ -331,6 +532,8 @@ export default function ChatsScreen() {
           data={directConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversationItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} tintColor={colors.primary} />
           }
@@ -360,82 +563,171 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
     borderBottomWidth: 0.5,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  headerBtn: {
-    marginLeft: spacing.md,
-    padding: spacing.xs,
+  headerActionBtn: {
+    padding: 6,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.md,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    height: 38,
+    borderRadius: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    paddingVertical: 0,
+  },
+  activeTrayContainer: {
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  activeTrayContent: {
+    paddingHorizontal: spacing.md,
+    gap: 14,
+  },
+  activeContactItem: {
+    alignItems: 'center',
+    width: 66,
+  },
+  activeAvatarWrapper: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  addNoteBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  activeContactName: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
     marginHorizontal: spacing.md,
-    marginVertical: spacing.sm,
-    borderRadius: borderRadius.md,
+    marginVertical: 8,
+    borderRadius: 10,
     padding: 3,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 7,
     alignItems: 'center',
-    borderRadius: borderRadius.sm,
+    borderRadius: 8,
   },
-  roomActionsBar: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+  tabBtnText: {
+    fontSize: 12,
   },
-  roomActionCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
+  listContent: {
+    paddingBottom: spacing.xl,
   },
-  chatItem: {
+  chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     borderBottomWidth: 0.5,
   },
-  chatInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
+  avatarContainer: {
+    position: 'relative',
   },
-  chatTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  chatBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
+  roomTypeBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  chatDetails: {
+    flex: 1,
+    marginLeft: spacing.sm + 4,
+    justifyContent: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titleText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  timeText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  messagePreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 3,
+  },
+  previewText: {
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  unreadBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
   unreadCountText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
   },
-  callActionBtn: {
+  callMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  callMetaText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  callActionPill: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -443,11 +735,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: spacing.sm,
   },
-  emptyContainer: {
-    padding: spacing.xl,
+  roomActionsBar: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  roomActionCard: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  roomActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
     marginTop: spacing.xl,
   },
 });
-

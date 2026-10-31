@@ -63,7 +63,7 @@ export const ReelsShareSheet: React.FC<ReelsShareSheetProps> = ({
 
   const loadConversations = async () => {
     setIsLoading(true);
-    const res = await api.get<ChatConversationSummary[]>('/chat/conversations');
+    const res = await api.get<ChatConversationSummary[]>('/chats/conversations');
     setIsLoading(false);
     if (res.success && res.data) {
       setConversations(res.data);
@@ -75,7 +75,7 @@ export const ReelsShareSheet: React.FC<ReelsShareSheetProps> = ({
 
     setSendingId(conversationId);
     try {
-      await api.post(`/chat/conversations/${conversationId}/messages`, {
+      await api.post(`/chats/conversations/${conversationId}/messages`, {
         contentType: 'shared_reel',
         content: reel.caption ? `Shared Reel: ${reel.caption}` : 'Shared a Reel',
         metadata: {
@@ -414,3 +414,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
