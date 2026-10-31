@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Avatar } from '../Avatar';
+import { AnimatedLikeButton } from '../common/AnimatedLikeButton';
 import { useFeedStore } from '../../store/useFeedStore';
 import { spacing, typography } from '../../theme/spacing';
 import { ReelSummary } from '@infernux/shared';
@@ -377,21 +378,19 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           )}
         </View>
 
-        {/* Like Button */}
-        <TouchableOpacity
-          style={styles.actionItem}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          onPress={handleLikeBtnPress}
-        >
-          <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
-            <Ionicons
-              name={item.isLiked ? 'heart' : 'heart-outline'}
-              size={34}
-              color={item.isLiked ? '#FF2E63' : '#FFFFFF'}
-            />
-          </Animated.View>
-          <Text style={styles.actionCount}>{formatCount(item.likesCount)}</Text>
-        </TouchableOpacity>
+        {/* Like Button with Bouncy Spring Scale & Animated Count */}
+        <View style={styles.actionItem}>
+          <AnimatedLikeButton
+            isLiked={item.isLiked}
+            likesCount={item.likesCount}
+            onPress={handleLikeBtnPress}
+            size={34}
+            showCount={true}
+            countPosition="below"
+            colorActive="#FF2E63"
+            colorInactive="#FFFFFF"
+          />
+        </View>
 
         {/* Comment Button */}
         <TouchableOpacity

@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../src/store/useThemeStore';
+import { AnimatedTabBarButton } from '../../src/components/navigation/AnimatedTabBarButton';
 
 export default function TabLayout() {
   const { colors } = useThemeStore();
@@ -16,6 +17,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarButton: (props) => <AnimatedTabBarButton {...props} />,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,

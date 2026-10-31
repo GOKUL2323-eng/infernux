@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Modal, Text, TouchableOpacity, Platform } from 'react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useThemeStore } from '../src/store/useThemeStore';
 import { useCallStore } from '../src/store/useCallStore';
 import { MiniMusicPlayer } from '../src/components/MiniMusicPlayer';
+import { SplashScreenView } from '../src/components/navigation/SplashScreenView';
+import { IncomingCallAlert } from '../src/components/call/IncomingCallAlert';
 import { Avatar } from '../src/components/Avatar';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius, typography } from '../src/theme/spacing';
@@ -15,6 +17,7 @@ export default function RootLayout() {
   const { isDarkMode, colors } = useThemeStore();
   const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
   const { incomingCall, acceptCall, rejectCall } = useCallStore();
+  const [splashFinished, setSplashFinished] = useState(false);
   const segments = useSegments();
   const router = useRouter();
 
@@ -49,14 +52,6 @@ export default function RootLayout() {
     }
   }, [isAuthenticated, isLoading, segments]);
 
-  if (isLoading) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   return (
     <SafeAreaProvider>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -81,39 +76,26 @@ export default function RootLayout() {
         {/* Global floating mini-player */}
         <MiniMusicPlayer />
 
-        {/* Global incoming call alert modal */}
-        {incomingCall && (
-          <Modal transparent visible={!!incomingCall} animationType="slide">
-            <View style={styles.incomingModalOverlay}>
-              <View style={[styles.incomingModalCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                <Avatar url={incomingCall.initiator?.avatarUrl} name={incomingCall.initiator?.displayName} size={64} />
-                <Text style={[typography.h3, { color: colors.text, marginTop: spacing.sm }]}>
-                  {incomingCall.initiator?.displayName || incomingCall.initiator?.username}
-                </Text>
-                <Text style={[typography.caption, { color: colors.primary, marginTop: spacing.xxs }]}>
-                  Incoming {incomingCall.callType === 'video' ? 'Video' : 'Voice'} Call...
-                </Text>
-                <View style={styles.incomingActions}>
-                  <TouchableOpacity
-                    onPress={rejectCall}
-                    style={[styles.callBtn, { backgroundColor: colors.error }]}
-                  >
-                    <Ionicons name="call" size={26} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await acceptCall();
-                      router.push(`/call/${incomingCall.id}` as any);
-                    }}
-                    style={[styles.callBtn, { backgroundColor: colors.success }]}
-                  >
-                    <Ionicons name="call" size={26} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
+        {/* Premium Splash Screen Animation on Initial Launch */}
+        {!splashFinished && (
+          <SplashScreenView
+            isReady={!isLoading}
+            onAnimationComplete={() => setSplashFinished(true)}
+          />
         )}
+
+        {/* Global incoming call alert with ripple ring animation */}
+        <IncomingCallAlert
+          incomingCall={incomingCall}
+          onAccept={async () => {
+            if (incomingCall) {
+              const callId = incomingCall.id;
+              await acceptCall();
+              router.push(`/call/${callId}` as any);
+            }
+          }}
+          onReject={rejectCall}
+        />
       </View>
     </SafeAreaProvider>
   );

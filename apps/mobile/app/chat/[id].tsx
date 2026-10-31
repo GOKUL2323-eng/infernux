@@ -11,6 +11,7 @@ import {
   Image,
   Alert,
   Modal,
+  Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +31,15 @@ import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
 import { VoiceMessageBubble } from '../../src/components/VoiceMessageBubble';
 import { RoomDetailsModal } from '../../src/components/RoomDetailsModal';
+import {
+  AnimatedMessageBubble,
+  hasMessageAnimated,
+  markMessageAsAnimated,
+} from '../../src/components/chat/AnimatedMessageBubble';
+import {
+  AnimatedReactionBadge,
+  AnimatedReactionButton,
+} from '../../src/components/chat/AnimatedReactionBadge';
 import { socketClient } from '../../src/socket/socketClient';
 import { uploadMediaAsset } from '../../src/utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
@@ -57,6 +67,10 @@ export default function ChatScreen() {
 
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<any>(null);
+  const recordingPulse = useRef(new Animated.Value(1)).current;
+  const mountTimeRef = useRef(Date.now());
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<MessageSummary | null>(null);
@@ -143,6 +157,28 @@ export default function ChatScreen() {
       await recorder.prepareToRecordAsync();
       recorder.record();
       setIsRecording(true);
+      setRecordingSeconds(0);
+
+      // Start duration counter
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      // Start pulsing recording indicator
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(recordingPulse, {
+            toValue: 0.25,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(recordingPulse, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
     } catch (err) {
       console.warn('Failed to start recording', err);
     }
@@ -151,9 +187,17 @@ export default function ChatScreen() {
   const stopVoiceRecording = async () => {
     if (!isRecording) return;
     try {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      recordingPulse.stopAnimation();
+      recordingPulse.setValue(1);
+
       await recorder.stop();
       setIsRecording(false);
       const uri = recorder.uri;
+      const finalDuration = recordingSeconds || 1;
 
       if (uri) {
         setIsUploading(true);
@@ -166,13 +210,18 @@ export default function ChatScreen() {
         setIsUploading(false);
 
         await sendMessage(conversationId, 'Voice Note', 'audio', [
-          { url: uploadedUrl, type: 'audio', duration: 10 },
+          { url: uploadedUrl, type: 'audio', duration: finalDuration },
         ]);
       }
     } catch (err) {
       console.warn('Failed to stop recording', err);
       setIsRecording(false);
       setIsUploading(false);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      recordingPulse.stopAnimation();
     }
   };
 
@@ -234,160 +283,161 @@ export default function ChatScreen() {
       item.contentType === 'shared_reel' ||
       (item.metadata && item.metadata.reelId);
 
-    return (
-      <TouchableOpacity
-        activeOpacity={0.92}
-        onLongPress={() => handleMessageLongPress(item)}
-        style={[
-          styles.messageRow,
-          isSender ? styles.messageRowSender : styles.messageRowReceiver,
-        ]}
-      >
-        {/* Receiver avatar next to bubble */}
-        {!isSender && (
-          <Avatar
-            url={item.sender.avatarUrl}
-            name={item.sender.displayName || item.sender.username}
-            size={30}
-          />
-        )}
+    const messageTime = new Date(item.createdAt).getTime();
+    const isNew =
+      !hasMessageAnimated(item.id) &&
+      messageTime > mountTimeRef.current - 2000;
 
-        <View
+    if (isNew) {
+      markMessageAsAnimated(item.id);
+    }
+
+    return (
+      <AnimatedMessageBubble isSender={isSender} isNew={isNew}>
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onLongPress={() => handleMessageLongPress(item)}
           style={[
-            styles.bubble,
-            isSender
-              ? [styles.bubbleSender, { backgroundColor: colors.primary }]
-              : [
-                  styles.bubbleReceiver,
-                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-                ],
+            styles.messageRow,
+            isSender ? styles.messageRowSender : styles.messageRowReceiver,
           ]}
         >
-          {/* Group sender name */}
-          {!isSender && isRoom && (
-            <Text style={[styles.senderUsername, { color: colors.secondary }]}>
-              @{item.sender.username}
-            </Text>
-          )}
-
-          {/* 1. Shared Reel Card */}
-          {isSharedReel ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.sharedReelCard}
-              onPress={() => router.push('/(tabs)/reels' as any)}
-            >
-              <View style={styles.sharedReelThumbContainer}>
-                {item.metadata?.thumbnailUrl ? (
-                  <Image
-                    source={{ uri: item.metadata.thumbnailUrl }}
-                    style={styles.sharedReelThumb}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.sharedReelPlaceholder}>
-                    <Ionicons name="film-outline" size={32} color="#FFFFFF" />
-                  </View>
-                )}
-                <View style={styles.sharedReelPlayBadge}>
-                  <Ionicons name="play" size={18} color="#FFFFFF" />
-                </View>
-              </View>
-              <View style={styles.sharedReelInfo}>
-                <Text numberOfLines={1} style={styles.sharedReelCreator}>
-                  @{item.metadata?.creatorUsername || 'creator'}
-                </Text>
-                <Text numberOfLines={2} style={styles.sharedReelCaption}>
-                  {item.metadata?.caption || item.content || 'Shared a Reel'}
-                </Text>
-                <View style={styles.watchReelRow}>
-                  <Ionicons name="play-circle" size={14} color="#6366F1" />
-                  <Text style={styles.watchReelText}>Watch Reel &rarr;</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ) : item.contentType === 'audio' && item.attachments && item.attachments[0] ? (
-            /* 2. Audio Voice Note Message */
-            <VoiceMessageBubble
-              audioUrl={item.attachments[0].url}
-              duration={item.attachments[0].duration}
-              isSender={isSender}
+          {/* Receiver avatar next to bubble */}
+          {!isSender && (
+            <Avatar
+              url={item.sender.avatarUrl}
+              name={item.sender.displayName || item.sender.username}
+              size={30}
             />
-          ) : item.contentType === 'image' && item.attachments && item.attachments[0] ? (
-            /* 3. Image Attachment Message */
-            <View>
-              <Image
-                source={{ uri: item.attachments[0].url }}
-                style={styles.attachmentImage}
-                resizeMode="cover"
-              />
-              {item.content && item.content !== 'Shared an image' ? (
-                <Text
-                  style={[
-                    styles.imageCaptionText,
-                    { color: isSender ? '#FFFFFF' : colors.text },
-                  ]}
-                >
-                  {item.content}
-                </Text>
-              ) : null}
-            </View>
-          ) : (
-            /* 4. Standard Text Message */
-            <Text
-              style={[
-                styles.messageText,
-                { color: isSender ? '#FFFFFF' : colors.text },
-              ]}
-            >
-              {item.content}
-            </Text>
           )}
 
-          {/* Reactions badge under message bubble */}
-          {item.reactions && item.reactions.length > 0 && (
-            <View style={styles.reactionsBadge}>
-              {Array.from(new Set(item.reactions.map((r) => r.emoji))).map((emoji, idx) => (
-                <Text key={idx} style={{ fontSize: 13, marginRight: 2 }}>
-                  {emoji}
-                </Text>
-              ))}
+          <View
+            style={[
+              styles.bubble,
+              isSender
+                ? [styles.bubbleSender, { backgroundColor: colors.primary }]
+                : [
+                    styles.bubbleReceiver,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  ],
+            ]}
+          >
+            {/* Group sender name */}
+            {!isSender && isRoom && (
+              <Text style={[styles.senderUsername, { color: colors.secondary }]}>
+                @{item.sender.username}
+              </Text>
+            )}
+
+            {/* 1. Shared Reel Card */}
+            {isSharedReel ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.sharedReelCard}
+                onPress={() => router.push('/(tabs)/reels' as any)}
+              >
+                <View style={styles.sharedReelThumbContainer}>
+                  {item.metadata?.thumbnailUrl ? (
+                    <Image
+                      source={{ uri: item.metadata.thumbnailUrl }}
+                      style={styles.sharedReelThumb}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.sharedReelPlaceholder}>
+                      <Ionicons name="film-outline" size={32} color="#FFFFFF" />
+                    </View>
+                  )}
+                  <View style={styles.sharedReelPlayBadge}>
+                    <Ionicons name="play" size={18} color="#FFFFFF" />
+                  </View>
+                </View>
+                <View style={styles.sharedReelInfo}>
+                  <Text numberOfLines={1} style={styles.sharedReelCreator}>
+                    @{item.metadata?.creatorUsername || 'creator'}
+                  </Text>
+                  <Text numberOfLines={2} style={styles.sharedReelCaption}>
+                    {item.metadata?.caption || item.content || 'Shared a Reel'}
+                  </Text>
+                  <View style={styles.watchReelRow}>
+                    <Ionicons name="play-circle" size={14} color="#6366F1" />
+                    <Text style={styles.watchReelText}>Watch Reel &rarr;</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ) : item.contentType === 'audio' && item.attachments && item.attachments[0] ? (
+              /* 2. Audio Voice Note Message */
+              <VoiceMessageBubble
+                audioUrl={item.attachments[0].url}
+                duration={item.attachments[0].duration}
+                isSender={isSender}
+              />
+            ) : item.contentType === 'image' && item.attachments && item.attachments[0] ? (
+              /* 3. Image Attachment Message */
+              <View>
+                <Image
+                  source={{ uri: item.attachments[0].url }}
+                  style={styles.attachmentImage}
+                  resizeMode="cover"
+                />
+                {item.content && item.content !== 'Shared an image' ? (
+                  <Text
+                    style={[
+                      styles.imageCaptionText,
+                      { color: isSender ? '#FFFFFF' : colors.text },
+                    ]}
+                  >
+                    {item.content}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              /* 4. Standard Text Message */
               <Text
                 style={[
-                  typography.caption,
-                  { color: isSender ? '#FFFFFF' : colors.textSecondary, fontSize: 10, marginLeft: 2 },
+                  styles.messageText,
+                  { color: isSender ? '#FFFFFF' : colors.text },
                 ]}
               >
-                {item.reactions.length}
+                {item.content}
               </Text>
-            </View>
-          )}
+            )}
 
-          {/* Message Footer: Timestamp & Read Receipts */}
-          <View style={styles.msgFooter}>
-            <Text
-              style={[
-                styles.timeText,
-                { color: isSender ? 'rgba(255,255,255,0.75)' : colors.textMuted },
-              ]}
-            >
-              {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-            {isSender && (
-              <Ionicons
-                name="checkmark-done"
-                size={14}
-                color={
-                  item.receipts?.some((r) => r.status === 'read')
-                    ? '#38BDF8'
-                    : 'rgba(255,255,255,0.7)'
-                }
-                style={{ marginLeft: 4 }}
+            {/* Reactions badge under message bubble with spring animations */}
+            {item.reactions && item.reactions.length > 0 && (
+              <AnimatedReactionBadge
+                reactions={item.reactions}
+                isSender={isSender}
+                onPress={() => handleMessageLongPress(item)}
               />
             )}
+
+            {/* Message Footer: Timestamp & Read Receipts */}
+            <View style={styles.msgFooter}>
+              <Text
+                style={[
+                  styles.timeText,
+                  { color: isSender ? 'rgba(255,255,255,0.75)' : colors.textMuted },
+                ]}
+              >
+                {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              {isSender && (
+                <Ionicons
+                  name="checkmark-done"
+                  size={14}
+                  color={
+                    item.receipts?.some((r) => r.status === 'read')
+                      ? '#38BDF8'
+                      : 'rgba(255,255,255,0.7)'
+                  }
+                  style={{ marginLeft: 4 }}
+                />
+              )}
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </AnimatedMessageBubble>
     );
   };
 
@@ -529,31 +579,58 @@ export default function ChatScreen() {
           ]}
         >
           {/* Camera / Image Attachment Button */}
-          <TouchableOpacity
-            onPress={handlePickImage}
-            disabled={isUploading}
-            style={styles.composerActionBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-          >
-            <Ionicons name="camera-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
+          {!isRecording && (
+            <TouchableOpacity
+              onPress={handlePickImage}
+              disabled={isUploading}
+              style={styles.composerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <Ionicons name="camera-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
 
-          {/* Rounded Message Input Field */}
-          <View style={[styles.inputPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-            <TextInput
-              placeholder={isUploading ? 'Uploading...' : 'Message...'}
-              placeholderTextColor={colors.textMuted}
-              value={inputText}
-              editable={!isUploading}
-              multiline
-              onChangeText={(text) => {
-                setInputText(text);
-                if (text.length > 0) socketClient.startTyping(conversationId);
-                else socketClient.stopTyping(conversationId);
-              }}
-              style={[styles.textInputField, { color: colors.text }]}
-            />
-          </View>
+          {/* Dynamic Recording Live Waveform Bar or Message Input Field */}
+          {isRecording ? (
+            <View style={[styles.recordingActiveContainer, { backgroundColor: colors.surfaceElevated, borderColor: colors.error }]}>
+              <Animated.View style={[styles.recordingLiveDot, { opacity: recordingPulse }]} />
+              <Text style={[styles.recordingTimerText, { color: colors.error }]}>
+                {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+              <View style={styles.recordingWavesRow}>
+                {[10, 18, 14, 22, 16, 26, 12, 20, 15, 24].map((h, i) => (
+                  <Animated.View
+                    key={i}
+                    style={[
+                      styles.recordingWaveBar,
+                      {
+                        height: h,
+                        backgroundColor: colors.error,
+                        opacity: recordingPulse,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>Release to send</Text>
+            </View>
+          ) : (
+            <View style={[styles.inputPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <TextInput
+                placeholder={isUploading ? 'Uploading...' : 'Message...'}
+                placeholderTextColor={colors.textMuted}
+                value={inputText}
+                editable={!isUploading}
+                multiline
+                onChangeText={(text) => {
+                  setInputText(text);
+                  if (text.length > 0) socketClient.startTyping(conversationId);
+                  else socketClient.stopTyping(conversationId);
+                }}
+                style={[styles.textInputField, { color: colors.text }]}
+              />
+            </View>
+          )}
 
           {/* Dynamic Send / Mic Action Button */}
           {inputText.trim().length > 0 ? (
@@ -598,16 +675,14 @@ export default function ChatScreen() {
             onPress={() => setSelectedMessage(null)}
           >
             <View style={[styles.actionSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {/* Quick Emojis Reaction Row */}
+              {/* Quick Emojis Reaction Row with Animated Pop & Float */}
               <View style={styles.emojiReactionRow}>
                 {QUICK_REACTIONS.map((emoji) => (
-                  <TouchableOpacity
+                  <AnimatedReactionButton
                     key={emoji}
-                    onPress={() => handleReact(emoji)}
-                    style={styles.reactionEmojiBtn}
-                  >
-                    <Text style={{ fontSize: 26 }}>{emoji}</Text>
-                  </TouchableOpacity>
+                    emoji={emoji}
+                    onSelect={(selectedEmoji) => handleReact(selectedEmoji)}
+                  />
                 ))}
               </View>
 
@@ -928,5 +1003,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginLeft: spacing.sm,
+  },
+  recordingActiveContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    minHeight: 40,
+    marginHorizontal: 4,
+  },
+  recordingLiveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    marginRight: 8,
+  },
+  recordingTimerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginRight: 10,
+  },
+  recordingWavesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 3,
+    height: 26,
+    marginRight: 8,
+  },
+  recordingWaveBar: {
+    width: 3,
+    borderRadius: 1.5,
   },
 });

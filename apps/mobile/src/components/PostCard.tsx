@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from './Avatar';
+import { DoubleTapLikeOverlay } from './common/DoubleTapLikeOverlay';
+import { AnimatedLikeButton } from './common/AnimatedLikeButton';
 import { useThemeStore } from '../store/useThemeStore';
 import { spacing, typography } from '../theme/spacing';
 import { PostSummary } from '@infernux/shared';
@@ -52,9 +54,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Media Image / Video */}
+      {/* Media Image / Video with Double-Tap Like Burst */}
       {primaryMedia && (
-        <View style={styles.mediaContainer}>
+        <DoubleTapLikeOverlay
+          isLiked={post.isLiked}
+          onLike={onLike}
+          style={styles.mediaContainer}
+        >
           <Image
             source={{ uri: primaryMedia.url }}
             style={[styles.media, { backgroundColor: colors.surfaceElevated }]}
@@ -64,23 +70,18 @@ export const PostCard: React.FC<PostCardProps> = ({
               <Ionicons name="play" size={16} color="#FFFFFF" />
             </View>
           )}
-        </View>
+        </DoubleTapLikeOverlay>
       )}
 
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
-          <TouchableOpacity
+          <AnimatedLikeButton
+            isLiked={post.isLiked}
             onPress={onLike}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            style={styles.actionBtn}
-          >
-            <Ionicons
-              name={post.isLiked ? 'heart' : 'heart-outline'}
-              size={26}
-              color={post.isLiked ? colors.error : colors.text}
-            />
-          </TouchableOpacity>
+            size={26}
+            colorActive={colors.error}
+          />
           <TouchableOpacity
             onPress={onComment}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
