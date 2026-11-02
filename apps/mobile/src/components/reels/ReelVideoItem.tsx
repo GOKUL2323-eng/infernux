@@ -61,19 +61,18 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   const [paused, setPaused] = useState(false);
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [showHeartAnim, setShowHeartAnim] = useState(false);
-  const [showPlayPauseBadge, setShowPlayPauseBadge] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
 
   // Animation values
   const heartScaleAnim = useRef(new Animated.Value(0)).current;
   const heartOpacityAnim = useRef(new Animated.Value(0)).current;
-  const playBadgeAnim = useRef(new Animated.Value(0)).current;
   const discSpinAnim = useRef(new Animated.Value(0)).current;
   const likeScaleAnim = useRef(new Animated.Value(1)).current;
 
   // Double tap detection
   const lastTapRef = useRef<number>(0);
+  const tapTimeoutRef = useRef<any>(null);
   const viewTimerRef = useRef<any>(null);
 
   // Preload rule: only mount VideoView for active and adjacent (±1) items
@@ -169,19 +168,25 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   // Tap handler: single tap = toggle pause/play; double tap = Instagram heart burst!
   const handleTouch = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
+    const DOUBLE_TAP_DELAY = 280;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      // Double tap!
-      handleDoubleTapLike();
+      // Double tap detected: cancel single-tap pause
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
       lastTapRef.current = 0;
+      handleDoubleTapLike();
     } else {
       lastTapRef.current = now;
-      setTimeout(() => {
-        // If not double tapped, trigger play/pause
-        if (Date.now() - lastTapRef.current >= DOUBLE_TAP_DELAY && lastTapRef.current !== 0) {
-          handleTogglePlayPause();
-        }
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+      tapTimeoutRef.current = setTimeout(() => {
+        tapTimeoutRef.current = null;
+        lastTapRef.current = 0;
+        handleTogglePlayPause();
       }, DOUBLE_TAP_DELAY);
     }
   };
@@ -190,14 +195,24 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     const nextPaused = !paused;
     setPaused(nextPaused);
 
-    // Show temporary play/pause badge in center
-    setShowPlayPauseBadge(true);
-    playBadgeAnim.setValue(1);
-    Animated.timing(playBadgeAnim, {
-      toValue: 0,
-      duration: 650,
-      useNativeDriver,
-    }).start(() => setShowPlayPauseBadge(false));
+    try {
+      if (nextPaused) {
+        player.pause();
+      } else {
+        const res = (player as any).play();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      }
+    } catch {
+      // safe ignore
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore
+    }
   };
 
   const handleDoubleTapLike = () => {
@@ -303,33 +318,18 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           pointerEvents="none"
         />
 
-        {/* Play/Pause Centered Badge Animation */}
-        {showPlayPauseBadge && (
-          <Animated.View
-            style={[
-              styles.centeredBadge,
-              {
-                opacity: playBadgeAnim,
-                transform: [
-                  {
-                    scale: playBadgeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1.1],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
+        {/* Play Centered Badge when paused (Instagram Style) */}
+        {paused && (
+          <View style={styles.centeredBadge} pointerEvents="none">
             <View style={styles.badgeCircle}>
               <Ionicons
-                name={paused ? 'pause' : 'play'}
-                size={44}
+                name="play"
+                size={42}
                 color="rgba(255,255,255,0.95)"
-                style={{ marginLeft: paused ? 0 : 4 }}
+                style={{ marginLeft: 4 }}
               />
             </View>
-          </Animated.View>
+          </View>
         )}
 
         {/* Double-Tap Heart Burst Animation */}
