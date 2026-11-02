@@ -38,6 +38,7 @@ interface ReelVideoItemProps {
   onOpenOptions: (reel: ReelSummary) => void;
   onOpenMusic: () => void;
   isAppActive: boolean;
+  isScreenFocused?: boolean;
 }
 
 export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
@@ -54,21 +55,30 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   onOpenOptions,
   onOpenMusic,
   isAppActive,
+  isScreenFocused = true,
 }) => {
   const router = useRouter();
   const { likeReel, saveReel, recordReelView, toggleFollowCreator, activeReelIndex } = useFeedStore();
 
-  const [paused, setPaused] = useState(false);
+  // Playback state variables (synchronized with player)
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const [currentPlaybackPosition, setCurrentPlaybackPosition] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [indicatorType, setIndicatorType] = useState<'play' | 'pause' | null>(null);
+
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [showHeartAnim, setShowHeartAnim] = useState(false);
-  const [playbackError, setPlaybackError] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
 
   // Animation values
   const heartScaleAnim = useRef(new Animated.Value(0)).current;
   const heartOpacityAnim = useRef(new Animated.Value(0)).current;
   const discSpinAnim = useRef(new Animated.Value(0)).current;
   const likeScaleAnim = useRef(new Animated.Value(1)).current;
+  const indicatorScaleAnim = useRef(new Animated.Value(0.5)).current;
+  const indicatorOpacityAnim = useRef(new Animated.Value(0)).current;
 
   // Double tap detection
   const lastTapRef = useRef<number>(0);
@@ -83,16 +93,10 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   const player = useVideoPlayer(safeVideoUrl, (p) => {
     p.loop = true;
     p.muted = Platform.OS === 'web' ? true : isMuted;
-    if (isActive && isAppActive && !paused) {
-      try {
-        const res = (p as any).play();
-        if (res && typeof res.catch === 'function') {
-          res.catch(() => {});
-        }
-      } catch {
-        // Safe catch for autoplay constraints
-      }
-    }
+    try {
+      p.timeUpdateEventInterval = 0.5;
+      p.staysActiveInBackground = false;
+    } catch {}
   });
 
   // Keep mute state in sync
@@ -102,22 +106,72 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     }
   }, [isMuted, player]);
 
-  // Handle Play/Pause based on visibility & app state
+  // Synchronize playback events from native player
   useEffect(() => {
     if (!player) return;
 
-    if (isActive && isAppActive && !paused) {
+    let playingSub: any;
+    let statusSub: any;
+    let timeSub: any;
+
+    try {
+      if (typeof player.addListener === 'function') {
+        playingSub = player.addListener('playingChange', (event: any) => {
+          setIsPlaying(Boolean(event.isPlaying));
+        });
+
+        statusSub = player.addListener('statusChange', (event: any) => {
+          setIsBuffering(event.status === 'loading');
+          if (event.status === 'error') {
+            setPlaybackError(true);
+          } else if (event.status === 'readyToPlay') {
+            setPlaybackError(false);
+          }
+        });
+
+        timeSub = player.addListener('timeUpdate', (event: any) => {
+          if (typeof event?.currentTime === 'number') {
+            setCurrentPlaybackPosition(event.currentTime);
+          }
+          if (player.duration > 0) {
+            setVideoDuration(player.duration);
+          }
+        });
+      }
+    } catch {}
+
+    return () => {
+      try {
+        if (playingSub?.remove) playingSub.remove();
+        if (statusSub?.remove) statusSub.remove();
+        if (timeSub?.remove) timeSub.remove();
+      } catch {}
+    };
+  }, [player]);
+
+  // Reset userPaused when swiping away or entering a new reel
+  useEffect(() => {
+    if (!isActive) {
+      setUserPaused(false);
+      setIndicatorType(null);
+    }
+  }, [isActive]);
+
+  // Orchestrate Play/Pause: only active, focused, active app, not user-paused
+  const shouldPlay = isActive && isScreenFocused && isAppActive && !userPaused;
+
+  useEffect(() => {
+    if (!player) return;
+
+    if (shouldPlay) {
       setPlaybackError(false);
       try {
         const res = (player as any).play();
         if (res && typeof res.catch === 'function') {
           res.catch(() => {});
         }
-      } catch {
-        // Safe catch for autoplay constraints
-      }
+      } catch {}
 
-      // Record view after 1.5 seconds of active watch time
       if (!viewTimerRef.current) {
         viewTimerRef.current = setTimeout(() => {
           recordReelView(item.id);
@@ -126,9 +180,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     } else {
       try {
         player.pause();
-      } catch {
-        // ignore
-      }
+      } catch {}
       if (viewTimerRef.current) {
         clearTimeout(viewTimerRef.current);
         viewTimerRef.current = null;
@@ -141,12 +193,12 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
         viewTimerRef.current = null;
       }
     };
-  }, [isActive, isAppActive, paused, player, item.id]);
+  }, [shouldPlay, player, item.id]);
 
   // Continuous spinning vinyl disc animation
   useEffect(() => {
     let animation: Animated.CompositeAnimation | null = null;
-    if (isActive && !paused) {
+    if (shouldPlay) {
       animation = Animated.loop(
         Animated.timing(discSpinAnim, {
           toValue: 1,
@@ -163,12 +215,39 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     return () => {
       if (animation) animation.stop();
     };
-  }, [isActive, paused]);
+  }, [shouldPlay]);
+
+  const showIndicator = (type: 'play' | 'pause') => {
+    setIndicatorType(type);
+    indicatorScaleAnim.setValue(0.5);
+    indicatorOpacityAnim.setValue(1);
+
+    Animated.parallel([
+      Animated.spring(indicatorScaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 90,
+        useNativeDriver,
+      }),
+      Animated.sequence([
+        Animated.delay(700),
+        Animated.timing(indicatorOpacityAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver,
+        }),
+      ]),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setIndicatorType(null);
+      }
+    });
+  };
 
   // Tap handler: single tap = toggle pause/play; double tap = Instagram heart burst!
   const handleTouch = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 280;
+    const DOUBLE_TAP_DELAY = 260;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       // Double tap detected: cancel single-tap pause
@@ -192,17 +271,21 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   };
 
   const handleTogglePlayPause = () => {
-    const nextPaused = !paused;
-    setPaused(nextPaused);
+    if (!player) return;
+
+    const nextPaused = !userPaused;
+    setUserPaused(nextPaused);
 
     try {
       if (nextPaused) {
         player.pause();
+        showIndicator('play');
       } else {
         const res = (player as any).play();
         if (res && typeof res.catch === 'function') {
           res.catch(() => {});
         }
+        showIndicator('pause');
       }
     } catch {
       // safe ignore
@@ -318,17 +401,32 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           pointerEvents="none"
         />
 
-        {/* Play Centered Badge when paused (Instagram Style) */}
-        {paused && (
+        {/* Buffering Loading Spinner */}
+        {isBuffering && isActive && (
+          <View style={styles.centeredSpinner} pointerEvents="none">
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+
+        {/* Play / Pause Animated Center Badge */}
+        {indicatorType && (
           <View style={styles.centeredBadge} pointerEvents="none">
-            <View style={styles.badgeCircle}>
+            <Animated.View
+              style={[
+                styles.badgeCircle,
+                {
+                  transform: [{ scale: indicatorScaleAnim }],
+                  opacity: indicatorOpacityAnim,
+                },
+              ]}
+            >
               <Ionicons
-                name="play"
-                size={42}
+                name={indicatorType === 'play' ? 'play' : 'pause'}
+                size={40}
                 color="rgba(255,255,255,0.95)"
-                style={{ marginLeft: 4 }}
+                style={indicatorType === 'play' ? { marginLeft: 4 } : undefined}
               />
-            </View>
+            </Animated.View>
           </View>
         )}
 
@@ -378,7 +476,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
       </TouchableOpacity>
 
       {/* 2. Right-Side Action Panel (Instagram Style) */}
-      <View style={[styles.rightActionsPanel, { bottom: bottomTabBarHeight + 16 }]}>
+      <View pointerEvents="box-none" style={[styles.rightActionsPanel, { bottom: bottomTabBarHeight + 16 }]}>
         {/* Creator Avatar & Quick Follow Badge */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity
@@ -481,7 +579,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
       </View>
 
       {/* 3. Bottom-Left Creator Information (Instagram Style) */}
-      <View style={[styles.bottomDetailsOverlay, { bottom: bottomTabBarHeight + 16 }]}>
+      <View pointerEvents="box-none" style={[styles.bottomDetailsOverlay, { bottom: bottomTabBarHeight + 16 }]}>
         {/* Creator Name & Follow Button Row */}
         <View style={styles.creatorRow}>
           <TouchableOpacity
@@ -576,21 +674,35 @@ const styles = StyleSheet.create({
     right: 0,
     height: 280,
   },
-  centeredBadge: {
-    ...StyleSheet.absoluteFill,
+  centeredSpinner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 15,
+  },
+  centeredBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 16,
   },
   badgeCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   centeredHeartContainer: {
     ...StyleSheet.absoluteFill,

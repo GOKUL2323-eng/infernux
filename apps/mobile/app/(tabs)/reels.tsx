@@ -12,7 +12,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useIsFocused } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../src/store/useFeedStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -27,6 +27,7 @@ import { ReelSummary } from '@infernux/shared';
 
 export default function ReelsScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuthStore();
@@ -104,6 +105,8 @@ export default function ReelsScreen() {
     router.push('/music' as any);
   }, [router]);
 
+  const isScreenFocused = isFocused && !isUploadModalVisible;
+
   const renderReelItem = useCallback(
     ({ item, index }: { item: ReelSummary; index: number }) => {
       const isActive = index === activeReelIndex;
@@ -123,6 +126,7 @@ export default function ReelsScreen() {
           onOpenOptions={handleOpenOptions}
           onOpenMusic={handleOpenMusic}
           isAppActive={isAppActive}
+          isScreenFocused={isScreenFocused}
         />
       );
     },
@@ -137,6 +141,7 @@ export default function ReelsScreen() {
       handleOpenOptions,
       handleOpenMusic,
       isAppActive,
+      isScreenFocused,
     ]
   );
 
