@@ -127,7 +127,14 @@ export interface SavedAccountInfo {
 
 export async function saveLastAccount(account: SavedAccountInfo): Promise<void> {
   try {
-    const raw = JSON.stringify(account);
+    const cleanAccount = {
+      ...account,
+      avatarUrl:
+        account.avatarUrl && (account.avatarUrl.startsWith('file:') || account.avatarUrl.includes('ImagePicker'))
+          ? undefined
+          : account.avatarUrl,
+    };
+    const raw = JSON.stringify(cleanAccount);
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(LAST_ACCOUNT_KEY, raw);
     } else if (Platform.OS !== 'web') {
@@ -146,7 +153,13 @@ export async function getLastAccount(): Promise<SavedAccountInfo | null> {
     } else if (Platform.OS !== 'web') {
       raw = await SecureStore.getItemAsync(LAST_ACCOUNT_KEY);
     }
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.avatarUrl && (parsed.avatarUrl.startsWith('file:') || parsed.avatarUrl.includes('ImagePicker'))) {
+        parsed.avatarUrl = undefined;
+      }
+      return parsed;
+    }
   } catch {
     // ignore
   }

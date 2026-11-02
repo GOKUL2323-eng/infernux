@@ -19,7 +19,7 @@ import { useFeedStore } from '../../src/store/useFeedStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
-import { uploadMediaAsset } from '../../src/utils/uploadHelper';
+import { uploadMediaAsset, sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 
 type CreateType = 'post' | 'reel' | 'story' | 'note';
@@ -300,7 +300,7 @@ export default function CreateScreen() {
               >
                 {selectedMedia ? (
                   <View style={StyleSheet.absoluteFill}>
-                    <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} />
+                    <Image source={{ uri: sanitizeMediaUrl(selectedMedia.uri) }} style={styles.previewImage} />
                     <TouchableOpacity
                       onPress={() => setSelectedMedia(null)}
                       style={styles.removeMediaBtn}

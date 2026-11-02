@@ -408,7 +408,7 @@ export default function ChatScreen() {
                 <View style={styles.sharedReelThumbContainer}>
                   {item.metadata?.thumbnailUrl ? (
                     <Image
-                      source={{ uri: item.metadata.thumbnailUrl }}
+                      source={{ uri: sanitizeMediaUrl(item.metadata.thumbnailUrl) }}
                       style={styles.sharedReelThumb}
                       resizeMode="cover"
                     />

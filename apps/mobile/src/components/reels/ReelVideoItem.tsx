@@ -22,7 +22,7 @@ import { useFeedStore } from '../../store/useFeedStore';
 import { spacing, typography } from '../../theme/spacing';
 import { ReelSummary } from '@infernux/shared';
 import { useNativeDriver } from '../../utils/animationHelper';
-import { sanitizeVideoUrl } from '../../utils/uploadHelper';
+import { sanitizeVideoUrl, sanitizeMediaUrl } from '../../utils/uploadHelper';
 
 interface ReelVideoItemProps {
   item: ReelSummary;
@@ -279,7 +279,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           />
         ) : (
           <Image
-            source={{ uri: item.thumbnailUrl || item.videoUrl }}
+            source={{ uri: sanitizeMediaUrl(item.thumbnailUrl || item.videoUrl) }}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
           />

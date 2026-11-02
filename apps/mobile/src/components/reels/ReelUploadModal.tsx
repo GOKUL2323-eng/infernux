@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../api/client';
-import { uploadMediaAsset } from '../../utils/uploadHelper';
+import { uploadMediaAsset, sanitizeMediaUrl } from '../../utils/uploadHelper';
 import { useFeedStore } from '../../store/useFeedStore';
 import { spacing } from '../../theme/spacing';
 
@@ -230,7 +230,7 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
           {selectedVideo ? (
             <View style={styles.previewContainer}>
               <Image
-                source={{ uri: selectedVideo.uri }}
+                source={{ uri: sanitizeMediaUrl(selectedVideo.uri) }}
                 style={styles.previewVideo}
                 resizeMode="cover"
               />
@@ -266,7 +266,7 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
               </View>
               <TouchableOpacity style={styles.coverPicker} onPress={handlePickCover}>
                 {selectedCover ? (
-                  <Image source={{ uri: selectedCover.uri }} style={styles.coverImage} />
+                  <Image source={{ uri: sanitizeMediaUrl(selectedCover.uri) }} style={styles.coverImage} />
                 ) : (
                   <View style={styles.coverPlaceholder}>
                     <Ionicons name="image-outline" size={20} color="#8E8E93" />

@@ -18,6 +18,7 @@ import * as FileSystem from 'expo-file-system';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MessageSummary } from '@infernux/shared';
 import { useNativeDriver } from '../../utils/animationHelper';
+import { sanitizeMediaUrl, sanitizeVideoUrl } from '../../utils/uploadHelper';
 
 interface PrivateMediaViewerModalProps {
   visible: boolean;
@@ -52,7 +53,8 @@ export const PrivateMediaViewerModal: React.FC<PrivateMediaViewerModalProps> = (
   const canSave = message?.mediaSavePolicy === 'allow_save' && !isViewOnce;
 
   // Video player hook (if video)
-  const player = useVideoPlayer(primaryAttachment?.url || '', (p) => {
+  const safeVideoUrl = sanitizeVideoUrl(primaryAttachment?.url);
+  const player = useVideoPlayer(safeVideoUrl, (p) => {
     p.loop = !isViewOnce;
     p.muted = false;
     try {
@@ -239,7 +241,7 @@ export const PrivateMediaViewerModal: React.FC<PrivateMediaViewerModalProps> = (
             />
           ) : (
             <Image
-              source={{ uri: primaryAttachment.url }}
+              source={{ uri: sanitizeMediaUrl(primaryAttachment.url) }}
               style={styles.fullMedia}
               resizeMode="contain"
             />

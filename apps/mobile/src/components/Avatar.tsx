@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Image, StyleSheet, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/useThemeStore';
+import { isLocalDeviceUri, sanitizeMediaUrl } from '../utils/uploadHelper';
 
 interface AvatarProps {
   url?: string;
@@ -20,8 +21,8 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const { colors } = useThemeStore();
 
-  const isLocalFileOnWeb = Platform.OS === 'web' && !!url && url.startsWith('file://');
-  const validUrl = isLocalFileOnWeb ? undefined : url;
+  const isLocalOnWeb = Platform.OS === 'web' && isLocalDeviceUri(url);
+  const validUrl = isLocalOnWeb || !url ? undefined : sanitizeMediaUrl(url);
 
   const initials = name
     .split(' ')

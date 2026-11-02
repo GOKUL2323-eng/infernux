@@ -16,12 +16,32 @@ export const DEFAULT_FALLBACK_VIDEO =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 /**
+ * Checks if a URI is a local device / sandboxed cache path (e.g. from an Android / iOS device ImagePicker)
+ */
+export function isLocalDeviceUri(uri?: string | null): boolean {
+  if (!uri || typeof uri !== 'string') return false;
+  const clean = uri.trim().toLowerCase();
+  return (
+    clean.startsWith('file:/') ||
+    clean.startsWith('content:/') ||
+    clean.startsWith('ph:/') ||
+    clean.includes('/data/user/0/') ||
+    clean.includes('/imagepicker/') ||
+    clean.includes('/experiencedata/')
+  );
+}
+
+/**
  * Sanitizes any media URL so local file:// paths never cause browser security errors on web.
  */
 export function sanitizeMediaUrl(url?: string | null, fallback = DEFAULT_FALLBACK_IMAGE): string {
   if (!url || typeof url !== 'string' || !url.trim()) return fallback;
   const clean = url.trim();
-  if (Platform.OS === 'web' && clean.startsWith('file://')) {
+  if (Platform.OS === 'web' && isLocalDeviceUri(clean)) {
+    return fallback;
+  }
+  // If the path contains an Android app sandbox cache path and this isn't that same local Android instance
+  if (clean.includes('/data/user/0/host.exp.exponent/cache/') && Platform.OS !== 'android') {
     return fallback;
   }
   return clean;
@@ -33,8 +53,20 @@ export function sanitizeMediaUrl(url?: string | null, fallback = DEFAULT_FALLBAC
 export function sanitizeVideoUrl(url?: string | null, fallback = DEFAULT_FALLBACK_VIDEO): string {
   if (!url || typeof url !== 'string' || !url.trim()) return fallback;
   const clean = url.trim();
-  if (Platform.OS === 'web' && clean.startsWith('file://')) {
-    return fallback;
+  if (Platform.OS === 'web') {
+    if (isLocalDeviceUri(clean)) return fallback;
+    const lower = clean.toLowerCase();
+    // Non-video media formats will throw NotSupportedError in HTML5 <video>
+    if (
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.gif') ||
+      lower.endsWith('.bmp')
+    ) {
+      return fallback;
+    }
   }
   return clean;
 }

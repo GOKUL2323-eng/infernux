@@ -53,9 +53,23 @@ export default function RootLayout() {
           event.preventDefault?.();
         }
       };
+
+      const handleGlobalError = (event: ErrorEvent) => {
+        const message = String(event?.message || '');
+        if (
+          message.includes('NotSupportedError') ||
+          message.includes('no supported source was found') ||
+          message.includes('Not allowed to load local resource')
+        ) {
+          event.preventDefault?.();
+        }
+      };
+
       window.addEventListener('unhandledrejection', handleUnhandledRejection);
+      window.addEventListener('error', handleGlobalError);
       return () => {
         window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        window.removeEventListener('error', handleGlobalError);
       };
     }
   }, []);
