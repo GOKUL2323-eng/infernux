@@ -70,9 +70,10 @@ export default function NotificationsScreen() {
         style={[
           styles.itemRow,
           { borderBottomColor: colors.border },
-          !item.isRead && { backgroundColor: colors.surfaceElevated },
+          !item.isRead && { backgroundColor: colors.card },
         ]}
       >
+        {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
         <Avatar url={item.actor.avatarUrl} name={item.actor.displayName} size={44} isVerified={item.actor.isVerified} />
         <View style={styles.content}>
           <Text style={[typography.body2, { color: colors.text }]}>
@@ -84,8 +85,8 @@ export default function NotificationsScreen() {
           </Text>
         </View>
 
-        <View style={styles.iconTag}>
-          <Ionicons name={iconConfig.name} size={18} color={iconConfig.color} />
+        <View style={[styles.iconTag, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name={iconConfig.name} size={16} color={iconConfig.color} />
         </View>
       </View>
     );
@@ -150,12 +151,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 0.5,
   },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: 8,
+  },
   content: {
     flex: 1,
     marginLeft: spacing.md,
   },
   iconTag: {
     marginLeft: spacing.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyContainer: {
     padding: spacing.xl,

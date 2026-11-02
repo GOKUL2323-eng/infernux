@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api/client';
 import { useFeedStore } from '../../src/store/useFeedStore';
@@ -27,10 +27,17 @@ type Audience = 'all' | 'followers' | 'close_friends';
 
 export default function CreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ initialMode?: CreateType }>();
   const { colors } = useThemeStore();
   const { loadFeed, loadReels, loadStories } = useFeedStore();
 
-  const [activeType, setActiveType] = useState<CreateType>('post');
+  const [activeType, setActiveType] = useState<CreateType>(params.initialMode || 'post');
+
+  useEffect(() => {
+    if (params.initialMode && ['post', 'reel', 'story', 'note'].includes(params.initialMode)) {
+      setActiveType(params.initialMode);
+    }
+  }, [params.initialMode]);
   const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [caption, setCaption] = useState('');
   const [audience, setAudience] = useState<Audience>('all');

@@ -23,6 +23,7 @@ import {
 } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatStore } from '../../src/store/useChatStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -371,23 +372,31 @@ export default function ChatScreen() {
             />
           )}
 
-          <View
-            style={[
-              styles.bubble,
-              isSender
-                ? [styles.bubbleSender, { backgroundColor: colors.primary }]
-                : [
+          {(() => {
+            const BubbleContainer = (isSender ? LinearGradient : View) as any;
+            const bubbleProps = isSender
+              ? {
+                  colors: colors.gradientPrimary,
+                  start: { x: 0, y: 0 },
+                  end: { x: 1, y: 1 },
+                  style: [styles.bubble, styles.bubbleSender],
+                }
+              : {
+                  style: [
+                    styles.bubble,
                     styles.bubbleReceiver,
-                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    { backgroundColor: colors.card, borderColor: colors.border },
                   ],
-            ]}
-          >
-            {/* Group sender name */}
-            {!isSender && isRoom && (
-              <Text style={[styles.senderUsername, { color: colors.secondary }]}>
-                @{item.sender.username}
-              </Text>
-            )}
+                };
+
+            return (
+              <BubbleContainer {...bubbleProps}>
+                {/* Group sender name */}
+                {!isSender && isRoom && (
+                  <Text style={[styles.senderUsername, { color: colors.secondary }]}>
+                    @{item.sender.username}
+                  </Text>
+                )}
 
             {/* 1. Shared Reel Card */}
             {isSharedReel ? (
@@ -556,7 +565,9 @@ export default function ChatScreen() {
                 />
               )}
             </View>
-          </View>
+          </BubbleContainer>
+        );
+      })()}
         </TouchableOpacity>
       </AnimatedMessageBubble>
     );
@@ -807,10 +818,16 @@ export default function ChatScreen() {
           {inputText.trim().length > 0 ? (
             <TouchableOpacity
               onPress={handleSendText}
-              style={[styles.sendPillBtn, { backgroundColor: colors.primary }]}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+              <LinearGradient
+                colors={colors.gradientPrimary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sendPillBtn}
+              >
+                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+              </LinearGradient>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity

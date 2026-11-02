@@ -10,12 +10,27 @@ export interface UploadAssetInput {
 }
 
 export const DEFAULT_FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800';
+  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'; // Dark purple abstract wallpaper
+
+export const DEFAULT_FALLBACK_VIDEO =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 /**
  * Sanitizes any media URL so local file:// paths never cause browser security errors on web.
  */
 export function sanitizeMediaUrl(url?: string | null, fallback = DEFAULT_FALLBACK_IMAGE): string {
+  if (!url || typeof url !== 'string' || !url.trim()) return fallback;
+  const clean = url.trim();
+  if (Platform.OS === 'web' && clean.startsWith('file://')) {
+    return fallback;
+  }
+  return clean;
+}
+
+/**
+ * Sanitizes video URLs so local file:// paths or unsupported formats on web use a valid streaming MP4.
+ */
+export function sanitizeVideoUrl(url?: string | null, fallback = DEFAULT_FALLBACK_VIDEO): string {
   if (!url || typeof url !== 'string' || !url.trim()) return fallback;
   const clean = url.trim();
   if (Platform.OS === 'web' && clean.startsWith('file://')) {

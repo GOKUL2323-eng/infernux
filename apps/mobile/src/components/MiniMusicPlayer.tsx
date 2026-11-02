@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore } from '../store/useMusicStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { spacing, borderRadius, typography } from '../theme/spacing';
+import { sanitizeMediaUrl } from '../utils/uploadHelper';
 
 export const MiniMusicPlayer: React.FC = () => {
   const { currentTrack, isPlaying, isMiniPlayerVisible, togglePlayPause, nextTrack, closeMiniPlayer } =
@@ -29,7 +30,7 @@ export const MiniMusicPlayer: React.FC = () => {
         },
       ]}
     >
-      <Image source={{ uri: currentTrack.coverUrl }} style={styles.cover} />
+      <Image source={{ uri: sanitizeMediaUrl(currentTrack.coverUrl) }} style={styles.cover} />
       <View style={styles.info}>
         <Text numberOfLines={1} style={[typography.body2, { color: colors.text, fontWeight: '700' }]}>
           {currentTrack.title}
@@ -77,7 +78,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.xs,
-    borderRadius: borderRadius.md,
+    borderRadius: 18,
     borderWidth: 1,
     elevation: 8,
     shadowColor: '#000',

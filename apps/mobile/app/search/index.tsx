@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../src/api/client';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
@@ -95,20 +96,26 @@ export default function SearchScreen() {
 
         <TouchableOpacity
           onPress={() => handleToggleFollow(item)}
-          style={[
-            styles.followBtn,
-            { backgroundColor: isFollowing ? colors.surfaceElevated : colors.primary },
-            isFollowing && { borderWidth: 1, borderColor: colors.border },
-          ]}
+          activeOpacity={0.8}
         >
-          <Text
-            style={[
-              typography.button,
-              { color: isFollowing ? colors.text : '#FFFFFF', fontSize: 12 },
-            ]}
-          >
-            {isFollowing ? 'Following' : 'Follow'}
-          </Text>
+          {isFollowing ? (
+            <View style={[styles.followBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[typography.button, { color: colors.text, fontSize: 12 }]}>
+                Following
+              </Text>
+            </View>
+          ) : (
+            <LinearGradient
+              colors={colors.gradientPrimary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.followBtn}
+            >
+              <Text style={[typography.button, { color: '#FFFFFF', fontSize: 12, fontWeight: '700' }]}>
+                Follow
+              </Text>
+            </LinearGradient>
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -121,8 +128,8 @@ export default function SearchScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <View style={[styles.searchBox, { backgroundColor: colors.surfaceElevated }]}>
-          <Ionicons name="search" size={20} color={colors.textMuted} />
+        <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
             placeholder="Search users, hashtags, rooms..."
             placeholderTextColor={colors.textMuted}

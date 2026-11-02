@@ -32,7 +32,7 @@ export const AnimatedLikeButton: React.FC<AnimatedLikeButtonProps> = ({
   size = 26,
   showCount = false,
   countPosition = 'right',
-  colorActive = '#EF4444',
+  colorActive = '#F04BBE',
   colorInactive,
   hitSlop = { top: 8, bottom: 8, left: 6, right: 6 },
 }) => {

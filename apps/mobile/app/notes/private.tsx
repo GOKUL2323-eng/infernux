@@ -172,7 +172,7 @@ export default function PrivateNotesScreen() {
       </View>
 
       {/* Search Bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.surfaceElevated }]}>
+      <View style={[styles.searchBar, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: 14 }]}>
         <Ionicons name="search" size={18} color={colors.textMuted} />
         <TextInput
           placeholder="Search private notes or #tags..."

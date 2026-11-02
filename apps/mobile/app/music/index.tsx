@@ -15,6 +15,7 @@ import { useMusicStore } from '../../src/store/useMusicStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { api } from '../../src/api/client';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
+import { sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { MusicTrack, PlaylistSummary } from '@infernux/shared';
 
 export default function MusicScreen() {
@@ -70,7 +71,7 @@ export default function MusicScreen() {
           isCurrent && { backgroundColor: colors.surfaceElevated },
         ]}
       >
-        <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
+        <Image source={{ uri: sanitizeMediaUrl(item.coverUrl) }} style={styles.trackCover} />
         <View style={styles.trackInfo}>
           <Text
             numberOfLines={1}
@@ -102,7 +103,7 @@ export default function MusicScreen() {
   const renderPlaylistItem = ({ item }: { item: PlaylistSummary }) => (
     <View style={[styles.playlistCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
       <Image
-        source={{ uri: item.coverUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' }}
+        source={{ uri: sanitizeMediaUrl(item.coverUrl) }}
         style={styles.playlistCover}
       />
       <View style={styles.playlistInfo}>

@@ -17,3 +17,4 @@ export function startPrivateRoomCleanupJob(intervalSeconds = 30): NodeJS.Timeout
     }
   }, intervalSeconds * 1000);
 }
+

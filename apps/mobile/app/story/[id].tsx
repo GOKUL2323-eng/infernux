@@ -9,14 +9,18 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFeedStore } from '../../src/store/useFeedStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
 import { api } from '../../src/api/client';
+import { sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, typography } from '../../src/theme/spacing';
 import { StoryItem } from '@infernux/shared';
 
@@ -28,6 +32,7 @@ export default function StoryViewerScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { stories } = useFeedStore();
+  const { colors } = useThemeStore();
 
   const userGroup = stories.find((g) => g.user.id === id);
   const storyItems = userGroup ? userGroup.stories : [];
@@ -76,7 +81,6 @@ export default function StoryViewerScreen() {
   const handleSendReply = async () => {
     if (!replyText.trim() || !userGroup) return;
 
-    // Send direct message
     const res = await api.post('/chats/conversations', {
       type: 'direct',
       recipientId: userGroup.user.id,
@@ -127,21 +131,23 @@ export default function StoryViewerScreen() {
 
   if (!currentStory) {
     return (
-      <View style={[styles.container, { backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: '#FFFFFF' }}>Story not found</Text>
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.text }}>Story not found</Text>
       </View>
     );
   }
 
+  const safeStoryMediaUrl = sanitizeMediaUrl(currentStory.mediaUrl);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#000000' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Tap zones for prev/next and hold to pause */}
       <TouchableWithoutFeedback
         onPressIn={() => setIsPaused(true)}
         onPressOut={() => setIsPaused(false)}
       >
         <View style={StyleSheet.absoluteFill}>
-          <Image source={{ uri: currentStory.mediaUrl }} style={styles.storyMedia} />
+          <Image source={{ uri: safeStoryMediaUrl }} style={styles.storyMedia} />
 
           {/* Left tap zone */}
           <TouchableOpacity activeOpacity={1} onPress={handlePrev} style={styles.leftTapZone} />
@@ -150,34 +156,46 @@ export default function StoryViewerScreen() {
         </View>
       </TouchableWithoutFeedback>
 
-      {/* Progress Bars */}
+      {/* 1. Progress Bars */}
       <View style={styles.progressBarsRow}>
-        {storyItems.map((item, idx) => (
-          <View key={item.id} style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: idx < currentIndex ? '100%' : idx === currentIndex ? '100%' : '0%',
-                },
-              ]}
-            />
-          </View>
-        ))}
+        {storyItems.map((item, idx) => {
+          const isActive = idx === currentIndex;
+          const isPassed = idx < currentIndex;
+          return (
+            <View key={item.id} style={styles.progressBarBg}>
+              {isPassed ? (
+                <View style={[styles.progressBarFill, { backgroundColor: colors.primary, width: '100%' }]} />
+              ) : isActive ? (
+                <LinearGradient
+                  colors={colors.gradientPrimary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.progressBarFill, { width: '100%' }]}
+                />
+              ) : null}
+            </View>
+          );
+        })}
       </View>
 
-      {/* Creator Header */}
+      {/* 2. Creator Header */}
       <View style={styles.creatorHeader}>
         <Avatar
           url={currentStory.creator?.avatarUrl}
           name={currentStory.creator?.displayName}
-          size={36}
+          size={38}
+          isVerified={currentStory.creator?.isVerified}
         />
         <View style={styles.creatorInfo}>
-          <Text style={[typography.body2, { color: '#FFFFFF', fontWeight: '700' }]}>
-            {currentStory.creator?.username}
-          </Text>
-          <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>
+          <View style={styles.nameRow}>
+            <Text style={[typography.body2, { color: '#FFFFFF', fontWeight: '800' }]}>
+              {currentStory.creator?.username}
+            </Text>
+            {currentStory.creator?.isVerified && (
+              <Ionicons name="checkmark-circle" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
+            )}
+          </View>
+          <Text style={[typography.caption, { color: colors.textSecondary }]}>
             {new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
@@ -194,16 +212,16 @@ export default function StoryViewerScreen() {
         </View>
       </View>
 
-      {/* Caption overlay if present */}
+      {/* 3. Caption overlay if present */}
       {currentStory.caption ? (
-        <View style={styles.captionOverlay}>
-          <Text style={[typography.body1, { color: '#FFFFFF', textAlign: 'center' }]}>
+        <View style={[styles.captionOverlay, { backgroundColor: 'rgba(33, 21, 43, 0.75)', borderColor: colors.border }]}>
+          <Text style={[typography.body1, { color: '#FFFFFF', textAlign: 'center', fontWeight: '600' }]}>
             {currentStory.caption}
           </Text>
         </View>
       ) : null}
 
-      {/* Bottom Section */}
+      {/* 4. Bottom Controls */}
       {currentStory.creatorId !== user?.id ? (
         <View style={[styles.bottomContainer, { bottom: insets.bottom > 0 ? insets.bottom + 10 : 24 }]}>
           {/* Quick Reaction Emojis */}
@@ -212,32 +230,62 @@ export default function StoryViewerScreen() {
               <TouchableOpacity
                 key={emoji}
                 onPress={() => handleQuickReaction(emoji)}
-                style={styles.quickEmojiBtn}
+                style={[
+                  styles.quickEmojiBtn,
+                  {
+                    backgroundColor: 'rgba(33, 21, 43, 0.85)',
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                <Text style={{ fontSize: 22 }}>{emoji}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {/* Reply Bar */}
           <View style={styles.bottomBar}>
             <TextInput
               placeholder={`Reply to ${currentStory.creator?.username}...`}
-              placeholderTextColor="rgba(255,255,255,0.6)"
+              placeholderTextColor="rgba(183, 175, 192, 0.7)"
               value={replyText}
               onChangeText={setReplyText}
-              style={styles.replyInput}
+              style={[
+                styles.replyInput,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: 'rgba(21, 16, 29, 0.85)',
+                  color: '#FFFFFF',
+                },
+              ]}
             />
             {replyText.trim().length > 0 && (
               <TouchableOpacity onPress={handleSendReply} style={styles.sendReplyBtn}>
-                <Ionicons name="send" size={20} color="#FFFFFF" />
+                <LinearGradient
+                  colors={colors.gradientPrimary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sendGradient}
+                >
+                  <Ionicons name="send" size={17} color="#FFFFFF" />
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
         </View>
       ) : (
-        <View style={[styles.viewersCountBar, { bottom: insets.bottom > 0 ? insets.bottom + 10 : 24 }]}>
-          <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
-          <Text style={[typography.caption, { color: '#FFFFFF', marginLeft: 6 }]}>
+        <View
+          style={[
+            styles.viewersCountBar,
+            {
+              backgroundColor: 'rgba(33, 21, 43, 0.85)',
+              borderColor: colors.border,
+              bottom: insets.bottom > 0 ? insets.bottom + 10 : 24,
+            },
+          ]}
+        >
+          <Ionicons name="eye-outline" size={18} color={colors.accent} />
+          <Text style={[typography.caption, { color: '#FFFFFF', marginLeft: 8, fontWeight: '700' }]}>
             {currentStory.viewsCount} Viewers
           </Text>
         </View>
@@ -279,13 +327,12 @@ const styles = StyleSheet.create({
   progressBarBg: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
   },
   creatorHeader: {
     flexDirection: 'row',
@@ -297,6 +344,10 @@ const styles = StyleSheet.create({
   creatorInfo: {
     flex: 1,
     marginLeft: spacing.sm,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   closeBtn: {
     padding: spacing.xs,
@@ -311,7 +362,6 @@ const styles = StyleSheet.create({
   },
   bottomContainer: {
     position: 'absolute',
-    bottom: 24,
     left: spacing.md,
     right: spacing.md,
   },
@@ -322,18 +372,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   quickEmojiBtn: {
-    padding: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 7,
     borderRadius: 20,
+    borderWidth: 1,
   },
   captionOverlay: {
     position: 'absolute',
     bottom: 140,
-    left: spacing.xl,
-    right: spacing.xl,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    left: spacing.lg,
+    right: spacing.lg,
     padding: spacing.md,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   bottomBar: {
     flexDirection: 'row',
@@ -344,25 +394,27 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    color: '#FFFFFF',
     paddingHorizontal: spacing.md,
+    fontSize: 14,
   },
   sendReplyBtn: {
     marginLeft: spacing.sm,
-    padding: spacing.xs,
+  },
+  sendGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   viewersCountBar: {
     position: 'absolute',
-    bottom: 24,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 1,
   },
 });
-

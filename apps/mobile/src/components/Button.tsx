@@ -6,10 +6,11 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../store/useThemeStore';
-import { spacing, borderRadius, typography } from '../theme/spacing';
+import { spacing, typography } from '../theme/spacing';
 
 interface ButtonProps {
   title: string;
@@ -39,9 +40,9 @@ export const Button: React.FC<ButtonProps> = ({
   const isGradient = variant === 'primary';
 
   const containerPadding = {
-    sm: { paddingVertical: 8, paddingHorizontal: 12 },
-    md: { paddingVertical: 12, paddingHorizontal: 20 },
-    lg: { paddingVertical: 16, paddingHorizontal: 24 },
+    sm: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 14 },
+    md: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16 },
+    lg: { paddingVertical: 16, paddingHorizontal: 26, borderRadius: 18 },
   }[size];
 
   const content = (
@@ -58,7 +59,9 @@ export const Button: React.FC<ButtonProps> = ({
           backgroundColor: 'transparent',
         },
         variant === 'secondary' && {
-          backgroundColor: colors.surfaceElevated,
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
         },
         variant === 'danger' && {
           backgroundColor: colors.error,
@@ -81,11 +84,12 @@ export const Button: React.FC<ButtonProps> = ({
               {
                 color:
                   variant === 'outline'
-                    ? colors.primary
+                    ? colors.primaryLight
                     : variant === 'ghost'
                     ? colors.textSecondary
                     : '#FFFFFF',
                 marginLeft: icon ? spacing.xs : 0,
+                fontWeight: '700',
               },
               textStyle,
             ]}
@@ -99,19 +103,30 @@ export const Button: React.FC<ButtonProps> = ({
 
   if (isGradient && !disabled) {
     return (
-      <TouchableOpacity activeOpacity={0.8} onPress={onPress} disabled={loading} style={style}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} disabled={loading} style={style}>
         <LinearGradient
           colors={colors.gradientPrimary}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.base, containerPadding, styles.gradientRadius]}
+          style={[
+            styles.base,
+            containerPadding,
+            styles.gradientGlow,
+            { shadowColor: colors.primary },
+          ]}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <>
               {icon}
-              <Text style={[typography.button, { color: '#FFFFFF', marginLeft: icon ? spacing.xs : 0 }, textStyle]}>
+              <Text
+                style={[
+                  typography.button,
+                  { color: '#FFFFFF', marginLeft: icon ? spacing.xs : 0, fontWeight: '700' },
+                  textStyle,
+                ]}
+              >
                 {title}
               </Text>
             </>
@@ -129,13 +144,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.md,
   },
-  gradientRadius: {
-    borderRadius: borderRadius.md,
+  gradientGlow: {
+    ...Platform.select({
+      ios: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(160, 32, 240, 0.35)',
+      } as any,
+    }),
   },
   disabled: {
     opacity: 0.5,
   },
 });
-

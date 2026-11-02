@@ -18,7 +18,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { Input } from './Input';
 import { Button } from './Button';
-import { uploadMediaAsset } from '../utils/uploadHelper';
+import { uploadMediaAsset, sanitizeMediaUrl } from '../utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../theme/spacing';
 
 interface EditProfileModalProps {
@@ -125,7 +125,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Cover Photo Picker */}
           <View style={styles.coverWrapper}>
             {coverUri ? (
-              <Image source={{ uri: coverUri }} style={styles.coverImage} />
+              <Image source={{ uri: sanitizeMediaUrl(coverUri) }} style={styles.coverImage} />
             ) : (
               <View style={[styles.coverFallback, { backgroundColor: colors.surfaceElevated }]} />
             )}
@@ -142,7 +142,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <View style={styles.avatarRow}>
             <View style={[styles.avatarContainer, { borderColor: colors.background }]}>
               {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                <Image source={{ uri: sanitizeMediaUrl(avatarUri) }} style={styles.avatarImg} />
               ) : (
                 <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
                   <Text style={styles.avatarLetter}>

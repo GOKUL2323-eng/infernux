@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 2.5,
     borderRadius: 1.5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#A020F0',
   },
   tabDivider: {
     width: 1,

@@ -192,22 +192,32 @@ async function request<T>(
     if (response.status === 401) {
       const refreshToken = await getRefreshToken();
       if (refreshToken && !endpoint.includes('/auth/refresh-token')) {
-        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
+        try {
+          const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
 
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          if (refreshData.success && refreshData.data) {
-            await setAuthTokens(refreshData.data.accessToken, refreshData.data.refreshToken);
-            headers.Authorization = `Bearer ${refreshData.data.accessToken}`;
-            const retryRes = await fetch(url, { ...options, headers });
-            return await retryRes.json();
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            if (refreshData.success && refreshData.data) {
+              await setAuthTokens(refreshData.data.accessToken, refreshData.data.refreshToken);
+              headers.Authorization = `Bearer ${refreshData.data.accessToken}`;
+              const retryRes = await fetch(url, { ...options, headers });
+              return await retryRes.json();
+            }
           }
+        } catch {
+          // ignore
         }
       }
+      // If refresh was impossible or failed, clear stale tokens
+      await clearAuthTokens();
+      return {
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Session expired. Please log in.' },
+      };
     }
 
     const data: ApiResponse<T> = await response.json();

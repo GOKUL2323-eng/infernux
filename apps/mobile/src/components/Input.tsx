@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: 16,
     paddingHorizontal: spacing.md,
     height: 50,
   },

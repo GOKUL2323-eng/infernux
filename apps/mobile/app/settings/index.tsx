@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   card: {
-    borderRadius: borderRadius.lg,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: spacing.sm,

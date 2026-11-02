@@ -13,6 +13,7 @@ import { useCallStore } from '../../src/store/useCallStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 
 export default function CallScreen() {
@@ -70,10 +71,10 @@ export default function CallScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#090A0F' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Details */}
       <View style={styles.topSection}>
-        <View style={styles.statusPill}>
+        <View style={[styles.statusPill, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <View style={[styles.pulseDot, { backgroundColor: colors.online }]} />
           <Text style={styles.callTypeStatus}>
             {activeCall?.status === 'ringing'
@@ -83,12 +84,21 @@ export default function CallScreen() {
         </View>
 
         <View style={styles.participantBlock}>
-          <Avatar
-            url={otherParty?.avatarUrl}
-            name={otherParty?.displayName || 'User'}
-            size={110}
-            isVerified={otherParty?.isVerified}
-          />
+          <LinearGradient
+            colors={colors.gradientPrimary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarPulseRing}
+          >
+            <View style={[styles.avatarInnerWrapper, { backgroundColor: colors.background }]}>
+              <Avatar
+                url={otherParty?.avatarUrl}
+                name={otherParty?.displayName || 'User'}
+                size={110}
+                isVerified={otherParty?.isVerified}
+              />
+            </View>
+          </LinearGradient>
           <Text style={[typography.h2, styles.callerName]}>
             {otherParty?.displayName || otherParty?.username || 'MOZHI Caller'}
           </Text>
@@ -211,6 +221,22 @@ const styles = StyleSheet.create({
   participantBlock: {
     alignItems: 'center',
     marginTop: spacing.xl,
+  },
+  avatarPulseRing: {
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInnerWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   callerName: {
     color: '#FFFFFF',

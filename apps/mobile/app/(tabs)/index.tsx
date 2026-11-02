@@ -113,8 +113,8 @@ export default function HomeScreen() {
   };
 
   const renderHeader = () => (
-    <View>
-      {/* Stories Tray */}
+    <View style={styles.feedHeaderWrapper}>
+      {/* 1. Stories Tray */}
       <View style={[styles.storiesContainer, { borderBottomColor: colors.border }]}>
         <ScrollView
           horizontal
@@ -127,7 +127,7 @@ export default function HomeScreen() {
               user={user}
               hasUnseenStories={false}
               isCurrentUser
-              onPress={() => router.push('/(tabs)/create' as any)}
+              onPress={() => router.push({ pathname: '/(tabs)/create', params: { initialMode: 'story' } } as any)}
             />
           )}
 
@@ -143,31 +143,44 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* Social Notes Quick Banner */}
+      {/* 2. Social Notes Quick Banner */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => router.push('/notes/social' as any)}
-        style={[styles.socialNoteBanner, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+        style={[
+          styles.socialNoteBanner,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
       >
-        <Ionicons name="sparkles" size={18} color={colors.primary} />
-        <Text style={[typography.body2, { color: colors.text, marginLeft: spacing.xs, flex: 1 }]}>
+        <Ionicons name="sparkles" size={18} color={colors.accent} />
+        <Text style={[typography.body2, { color: colors.text, marginLeft: spacing.xs + 2, flex: 1, fontWeight: '600' }]}>
           Social Notes: See what friends are thinking & listening to
         </Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* Feed Filters */}
+      {/* 3. Feed Filters */}
       <View style={[styles.filterBar, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => setActiveFilter('all')}
-          style={[styles.filterTab, activeFilter === 'all' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+          style={[
+            styles.filterTab,
+            activeFilter === 'all' && {
+              borderBottomColor: colors.primary,
+              borderBottomWidth: 2.5,
+            },
+          ]}
         >
           <Text
             style={[
               typography.caption,
+              styles.filterTabText,
               {
-                color: activeFilter === 'all' ? colors.primary : colors.textMuted,
-                fontWeight: activeFilter === 'all' ? '700' : '500',
+                color: activeFilter === 'all' ? colors.text : colors.textMuted,
+                fontWeight: activeFilter === 'all' ? '800' : '600',
               },
             ]}
           >
@@ -177,14 +190,21 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           onPress={() => setActiveFilter('following')}
-          style={[styles.filterTab, activeFilter === 'following' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+          style={[
+            styles.filterTab,
+            activeFilter === 'following' && {
+              borderBottomColor: colors.primary,
+              borderBottomWidth: 2.5,
+            },
+          ]}
         >
           <Text
             style={[
               typography.caption,
+              styles.filterTabText,
               {
-                color: activeFilter === 'following' ? colors.primary : colors.textMuted,
-                fontWeight: activeFilter === 'following' ? '700' : '500',
+                color: activeFilter === 'following' ? colors.text : colors.textMuted,
+                fontWeight: activeFilter === 'following' ? '800' : '600',
               },
             ]}
           >
@@ -197,7 +217,8 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header />
+      <Header title="Community" />
+
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -213,6 +234,7 @@ export default function HomeScreen() {
             onOptionsPress={() => handleOptions(item)}
           />
         )}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing || isLoadingPosts}
@@ -223,12 +245,19 @@ export default function HomeScreen() {
         ListEmptyComponent={
           !isLoadingPosts ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="images-outline" size={48} color={colors.textMuted} />
+              <View style={[styles.emptyIconCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="sparkles" size={40} color={colors.primary} />
+              </View>
               <Text style={[typography.h3, { color: colors.text, marginTop: spacing.md }]}>
-                No Posts Yet
+                Welcome to Community
               </Text>
-              <Text style={[typography.body2, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>
-                Follow friends or tap Create to share your first post!
+              <Text
+                style={[
+                  typography.body2,
+                  { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs, maxWidth: 280 },
+                ]}
+              >
+                Follow creators, share your favorite moments, or tap + to create your first post!
               </Text>
             </View>
           ) : undefined
@@ -253,6 +282,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  feedHeaderWrapper: {
+    marginBottom: spacing.sm,
+  },
   storiesContainer: {
     paddingVertical: spacing.sm,
     borderBottomWidth: 0.5,
@@ -263,12 +295,12 @@ const styles = StyleSheet.create({
   socialNoteBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: spacing.md,
+    marginHorizontal: spacing.sm + 4,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    borderRadius: borderRadius.lg,
+    paddingVertical: 12,
+    borderRadius: 18,
     borderWidth: 1,
   },
   filterBar: {
@@ -278,13 +310,28 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   filterTab: {
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
     marginRight: spacing.lg,
+  },
+  filterTabText: {
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  listContent: {
+    paddingBottom: spacing.xxl,
   },
   emptyContainer: {
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xl,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
 });

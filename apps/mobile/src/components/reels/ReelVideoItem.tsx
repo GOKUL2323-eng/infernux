@@ -22,6 +22,7 @@ import { useFeedStore } from '../../store/useFeedStore';
 import { spacing, typography } from '../../theme/spacing';
 import { ReelSummary } from '@infernux/shared';
 import { useNativeDriver } from '../../utils/animationHelper';
+import { sanitizeVideoUrl } from '../../utils/uploadHelper';
 
 interface ReelVideoItemProps {
   item: ReelSummary;
@@ -76,8 +77,9 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   // Preload rule: only mount VideoView for active and adjacent (±1) items
   const shouldMountPlayer = Math.abs(index - activeReelIndex) <= 1;
 
-  // Video Player initialization
-  const player = useVideoPlayer(item.videoUrl, (p) => {
+  // Video Player initialization with safe web fallback
+  const safeVideoUrl = sanitizeVideoUrl(item.videoUrl);
+  const player = useVideoPlayer(safeVideoUrl, (p) => {
     p.loop = true;
     p.muted = Platform.OS === 'web' ? true : isMuted;
     if (isActive && isAppActive && !paused) {
@@ -406,7 +408,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
             size={34}
             showCount={true}
             countPosition="below"
-            colorActive="#FF2E63"
+            colorActive="#F04BBE"
             colorInactive="#FFFFFF"
           />
         </View>
@@ -442,7 +444,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           <Ionicons
             name={item.isSaved ? 'bookmark' : 'bookmark-outline'}
             size={28}
-            color={item.isSaved ? '#6366F1' : '#FFFFFF'}
+            color={item.isSaved ? '#A020F0' : '#FFFFFF'}
           />
         </TouchableOpacity>
 
@@ -646,7 +648,7 @@ const styles = StyleSheet.create({
   followBadge: {
     position: 'absolute',
     bottom: -6,
-    backgroundColor: '#EC4899',
+    backgroundColor: '#F04BBE',
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -679,7 +681,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#111116',
     borderWidth: 2,
-    borderColor: '#33333F',
+    borderColor: '#30233B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -687,7 +689,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#A020F0',
     alignItems: 'center',
     justifyContent: 'center',
   },

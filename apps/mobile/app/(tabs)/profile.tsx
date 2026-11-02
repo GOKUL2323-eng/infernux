@@ -9,10 +9,12 @@ import {
   useWindowDimensions,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
@@ -20,6 +22,7 @@ import { EditProfileModal } from '../../src/components/EditProfileModal';
 import { UserListModal } from '../../src/components/UserListModal';
 import { CommentsModal } from '../../src/components/CommentsModal';
 import { api } from '../../src/api/client';
+import { sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 import { PostSummary, ReelSummary } from '@infernux/shared';
 
@@ -31,7 +34,8 @@ export default function ProfileScreen() {
   const { user, logout, deleteAccount } = useAuthStore();
   const { colors } = useThemeStore();
 
-  const gridItemSize = Math.floor((width - 4) / 3);
+  const GRID_SPACING = 4;
+  const gridItemSize = Math.floor((width - (spacing.md * 2) - (GRID_SPACING * 2)) / 3);
 
   const [activeTab, setActiveTab] = useState<ProfileTab>('posts');
   const [userPosts, setUserPosts] = useState<PostSummary[]>([]);
@@ -122,126 +126,192 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Bar */}
+      {/* 1. Top Bar */}
       <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-        <Text style={[typography.h3, { color: colors.text }]}>
-          @{user?.username || 'profile'}
-        </Text>
+        <View style={styles.usernameRow}>
+          <Text numberOfLines={1} style={[typography.h3, styles.usernameText, { color: colors.text }]}>
+            @{user?.username || 'profile'}
+          </Text>
+          {user?.isVerified && (
+            <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginLeft: 4 }} />
+          )}
+        </View>
+
         <View style={styles.topRight}>
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push('/notes/private' as any)}
           >
-            <Ionicons name="document-text-outline" size={22} color={colors.text} />
+            <Ionicons name="document-text-outline" size={21} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push('/music' as any)}
           >
-            <Ionicons name="musical-notes-outline" size={22} color={colors.text} />
+            <Ionicons name="musical-notes-outline" size={21} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push('/settings' as any)}
           >
-            <Ionicons name="settings-outline" size={22} color={colors.text} />
+            <Ionicons name="settings-outline" size={21} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={handleSignOut}
           >
-            <Ionicons name="log-out-outline" size={22} color={colors.error} />
+            <Ionicons name="log-out-outline" size={21} color={colors.error} />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Cover Image */}
-        {user?.coverImageUrl ? (
-          <Image source={{ uri: user.coverImageUrl }} style={styles.coverImage} />
-        ) : (
-          <View style={[styles.coverFallback, { backgroundColor: colors.surfaceElevated }]} />
-        )}
+        {/* 2. Cover Banner */}
+        <View style={styles.coverWrapper}>
+          {user?.coverImageUrl ? (
+            <Image
+              source={{ uri: sanitizeMediaUrl(user.coverImageUrl) }}
+              style={styles.coverImage}
+            />
+          ) : (
+            <LinearGradient
+              colors={['#21152B', '#15101D', '#08060D']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.coverFallback}
+            />
+          )}
+        </View>
 
-        {/* Profile Info Row */}
+        {/* 3. Profile Avatar & Stats Header */}
         <View style={styles.profileHeader}>
-          <View style={[styles.avatarWrapper, { borderColor: colors.background }]}>
-            <Avatar url={user?.avatarUrl} name={user?.displayName} size={84} isVerified={user?.isVerified} />
-          </View>
+          {/* Avatar with purple gradient glow ring */}
+          <LinearGradient
+            colors={colors.gradientPrimary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarGlowRing}
+          >
+            <View style={[styles.avatarInnerContainer, { backgroundColor: colors.background }]}>
+              <Avatar
+                url={user?.avatarUrl}
+                name={user?.displayName}
+                size={82}
+                isVerified={user?.isVerified}
+              />
+            </View>
+          </LinearGradient>
 
-          {/* Stats */}
-          <View style={styles.statsRow}>
+          {/* Glassmorphic Stats Container */}
+          <View
+            style={[
+              styles.statsContainer,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             <View style={styles.statItem}>
-              <Text style={[typography.h3, { color: colors.text }]}>{userPosts.length}</Text>
+              <Text style={[typography.h3, styles.statNumber, { color: colors.text }]}>
+                {userPosts.length}
+              </Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Posts</Text>
             </View>
 
-            <TouchableOpacity onPress={openFollowers} style={styles.statItem}>
-              <Text style={[typography.h3, { color: colors.text }]}>{user?.followersCount || 0}</Text>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity onPress={openFollowers} style={styles.statItem} activeOpacity={0.7}>
+              <Text style={[typography.h3, styles.statNumber, { color: colors.text }]}>
+                {(user?.followersCount || 0).toLocaleString()}
+              </Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Followers</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={openFollowing} style={styles.statItem}>
-              <Text style={[typography.h3, { color: colors.text }]}>{user?.followingCount || 0}</Text>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity onPress={openFollowing} style={styles.statItem} activeOpacity={0.7}>
+              <Text style={[typography.h3, styles.statNumber, { color: colors.text }]}>
+                {(user?.followingCount || 0).toLocaleString()}
+              </Text>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Following</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Display Name & Bio */}
+        {/* 4. Display Name & Bio */}
         <View style={styles.bioSection}>
-          <Text style={[typography.body1, { color: colors.text, fontWeight: '700' }]}>
-            {user?.displayName}
+          <Text style={[typography.body1, styles.displayName, { color: colors.text }]}>
+            {user?.displayName || user?.username}
           </Text>
           {user?.bio ? (
-            <Text style={[typography.body2, { color: colors.textSecondary, marginTop: 4 }]}>
+            <Text style={[typography.body2, styles.bioText, { color: colors.textSecondary }]}>
               {user.bio}
             </Text>
           ) : null}
         </View>
 
-        {/* Action Buttons */}
+        {/* 5. Action Buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={() => setIsEditProfileVisible(true)}
-            style={[styles.editBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            style={[
+              styles.editBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
           >
             <Text numberOfLines={1} style={[typography.button, { color: colors.text, fontSize: 13 }]}>
               Edit Profile
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => router.push('/room/create' as any)}
-            style={[styles.shareBtn, { backgroundColor: colors.primary }]}
+            style={styles.newRoomBtn}
           >
-            <Ionicons name="key" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-            <Text numberOfLines={1} style={[typography.button, { color: '#FFFFFF', fontSize: 13 }]}>
-              New Room
-            </Text>
+            <LinearGradient
+              colors={colors.gradientPrimary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.newRoomGradient}
+            >
+              <Ionicons name="shield-checkmark" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
+              <Text numberOfLines={1} style={[typography.button, { color: '#FFFFFF', fontSize: 13 }]}>
+                Private Room
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
+
           <TouchableOpacity
-            onPress={handleSignOut}
-            style={[styles.logoutBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            onPress={() => router.push('/search' as any)}
+            style={[
+              styles.discoverBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
           >
-            <Ionicons name="log-out-outline" size={14} color={colors.error} style={{ marginRight: 4 }} />
-            <Text numberOfLines={1} style={[typography.button, { color: colors.error, fontSize: 13 }]}>
-              Sign Out
-            </Text>
+            <Ionicons name="person-add-outline" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        {/* Tab Icons Row */}
+        {/* 6. Content Segmented Tabs */}
         <View style={[styles.tabIconsRow, { borderBottomColor: colors.border }]}>
           <TouchableOpacity
             onPress={() => setActiveTab('posts')}
             style={[
               styles.tabIconBtn,
-              activeTab === 'posts' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+              activeTab === 'posts' && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 },
             ]}
           >
             <Ionicons
@@ -255,7 +325,7 @@ export default function ProfileScreen() {
             onPress={() => setActiveTab('reels')}
             style={[
               styles.tabIconBtn,
-              activeTab === 'reels' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+              activeTab === 'reels' && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 },
             ]}
           >
             <Ionicons
@@ -269,7 +339,7 @@ export default function ProfileScreen() {
             onPress={() => setActiveTab('saved')}
             style={[
               styles.tabIconBtn,
-              activeTab === 'saved' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+              activeTab === 'saved' && { borderBottomColor: colors.primary, borderBottomWidth: 2.5 },
             ]}
           >
             <Ionicons
@@ -280,27 +350,43 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Grid Display */}
+        {/* 7. Grid Display */}
         {activeTab === 'posts' ? (
           userPosts.length > 0 ? (
             <View style={styles.grid}>
-              {userPosts.map((post) => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
-                  onPress={() => setSelectedPostIdForComments(post.id)}
-                >
-                  <Image
-                    source={{ uri: post.media[0]?.url }}
-                    style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
-                  />
-                </TouchableOpacity>
-              ))}
+              {userPosts.map((post) => {
+                const imgUrl = post.media && post.media.length > 0 ? sanitizeMediaUrl(post.media[0].url) : '';
+                return (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[
+                      styles.gridCell,
+                      {
+                        width: gridItemSize,
+                        height: gridItemSize,
+                        borderColor: colors.border,
+                        backgroundColor: colors.card,
+                      },
+                    ]}
+                    onPress={() => setSelectedPostIdForComments(post.id)}
+                  >
+                    {imgUrl ? (
+                      <Image source={{ uri: imgUrl }} style={styles.gridImage} />
+                    ) : (
+                      <View style={[styles.gridPlaceholder, { backgroundColor: colors.surface }]}>
+                        <Ionicons name="image-outline" size={24} color={colors.textMuted} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ) : (
             <View style={styles.tabEmptyContainer}>
-              <Ionicons name="images-outline" size={40} color={colors.textMuted} />
-              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+              <View style={[styles.tabEmptyIconCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="images-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
                 No posts shared yet
               </Text>
             </View>
@@ -308,27 +394,37 @@ export default function ProfileScreen() {
         ) : activeTab === 'reels' ? (
           userReels.length > 0 ? (
             <View style={styles.grid}>
-              {userReels.map((reel) => (
-                <TouchableOpacity
-                  key={reel.id}
-                  style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
-                  onPress={() => router.push('/(tabs)/reels' as any)}
-                >
-                  <Image
-                    source={{ uri: reel.thumbnailUrl }}
-                    style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
-                  />
-                  <View style={styles.reelOverlay}>
-                    <Ionicons name="play" size={14} color="#FFFFFF" />
-                    <Text style={styles.reelViews}>{reel.viewsCount}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {userReels.map((reel) => {
+                const thumb = sanitizeMediaUrl(reel.thumbnailUrl);
+                return (
+                  <TouchableOpacity
+                    key={reel.id}
+                    style={[
+                      styles.gridCell,
+                      {
+                        width: gridItemSize,
+                        height: gridItemSize * 1.35,
+                        borderColor: colors.border,
+                        backgroundColor: colors.card,
+                      },
+                    ]}
+                    onPress={() => router.push('/(tabs)/reels' as any)}
+                  >
+                    <Image source={{ uri: thumb }} style={styles.gridImage} />
+                    <View style={styles.reelOverlay}>
+                      <Ionicons name="play" size={13} color="#FFFFFF" />
+                      <Text style={styles.reelViews}>{reel.viewsCount.toLocaleString()}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ) : (
             <View style={styles.tabEmptyContainer}>
-              <Ionicons name="videocam-outline" size={40} color={colors.textMuted} />
-              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+              <View style={[styles.tabEmptyIconCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="videocam-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
                 No reels created yet
               </Text>
             </View>
@@ -338,23 +434,33 @@ export default function ProfileScreen() {
             <View style={styles.grid}>
               {userPosts
                 .filter((p) => p.isSaved)
-                .map((post) => (
-                  <TouchableOpacity
-                    key={post.id}
-                    style={[styles.gridCell, { width: gridItemSize, height: gridItemSize }]}
-                    onPress={() => setSelectedPostIdForComments(post.id)}
-                  >
-                    <Image
-                      source={{ uri: post.media[0]?.url }}
-                      style={[styles.gridImage, { backgroundColor: colors.surfaceElevated }]}
-                    />
-                  </TouchableOpacity>
-                ))}
+                .map((post) => {
+                  const imgUrl = post.media && post.media.length > 0 ? sanitizeMediaUrl(post.media[0].url) : '';
+                  return (
+                    <TouchableOpacity
+                      key={post.id}
+                      style={[
+                        styles.gridCell,
+                        {
+                          width: gridItemSize,
+                          height: gridItemSize,
+                          borderColor: colors.border,
+                          backgroundColor: colors.card,
+                        },
+                      ]}
+                      onPress={() => setSelectedPostIdForComments(post.id)}
+                    >
+                      <Image source={{ uri: imgUrl }} style={styles.gridImage} />
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
           ) : (
             <View style={styles.tabEmptyContainer}>
-              <Ionicons name="bookmark-outline" size={40} color={colors.textMuted} />
-              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+              <View style={[styles.tabEmptyIconCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="bookmark-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
                 No saved posts
               </Text>
             </View>
@@ -371,18 +477,18 @@ export default function ProfileScreen() {
         />
       )}
 
-      {/* User List Modal (Followers / Following) */}
-      {userListModalConfig.visible && user && (
+      {/* Followers / Following List Modal */}
+      {userListModalConfig.visible && (
         <UserListModal
           visible={userListModalConfig.visible}
-          title={userListModalConfig.title}
-          userId={user.id}
           type={userListModalConfig.type}
+          title={userListModalConfig.title}
+          userId={user?.id || ''}
           onClose={() => setUserListModalConfig((prev) => ({ ...prev, visible: false }))}
         />
       )}
 
-      {/* Post Comments Modal */}
+      {/* Real Comments Modal */}
       {selectedPostIdForComments && (
         <CommentsModal
           visible={!!selectedPostIdForComments}
@@ -400,119 +506,176 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: spacing.xxl,
+  },
   topBar: {
+    height: 52,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 0.5,
+    borderBottomWidth: 1,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  usernameText: {
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   topRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   iconBtn: {
     padding: spacing.xs,
-    marginLeft: spacing.xs,
+    minWidth: 34,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverWrapper: {
+    height: 120,
+    width: '100%',
   },
   coverImage: {
     width: '100%',
-    height: 120,
+    height: '100%',
     resizeMode: 'cover',
   },
   coverFallback: {
     width: '100%',
-    height: 120,
+    height: '100%',
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    marginTop: -42,
+    marginTop: -36,
   },
-  avatarWrapper: {
-    borderWidth: 3,
-    borderRadius: 50,
+  avatarGlowRing: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    padding: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statsRow: {
-    flexDirection: 'row',
+  avatarInnerContainer: {
+    width: 85,
+    height: 85,
+    borderRadius: 42.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  statsContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-around',
-    marginLeft: spacing.lg,
-    marginTop: 35,
+    marginLeft: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   statItem: {
     alignItems: 'center',
-    padding: spacing.xxs,
+    flex: 1,
+  },
+  statNumber: {
+    fontWeight: '800',
+    fontSize: 17,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
   },
   bioSection: {
     paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.sm + 4,
+  },
+  displayName: {
+    fontWeight: '800',
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  bioText: {
+    marginTop: 4,
+    lineHeight: 19,
   },
   actionRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    gap: spacing.sm,
     marginTop: spacing.md,
+    gap: 8,
   },
   editBtn: {
-    flex: 1.2,
-    height: 36,
-    borderRadius: borderRadius.md,
+    flex: 1,
+    height: 38,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shareBtn: {
+  newRoomBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    height: 36,
-    borderRadius: borderRadius.md,
+    height: 38,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
-  logoutBtn: {
-    flex: 1,
+  newRoomGradient: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    height: 36,
-    borderRadius: borderRadius.md,
+  },
+  discoverBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabIconsRow: {
     flexDirection: 'row',
-    marginTop: spacing.md,
-    borderBottomWidth: 0.5,
+    marginTop: spacing.lg,
+    borderBottomWidth: 1,
   },
   tabIconBtn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 2,
-    marginTop: 2,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    gap: 4,
   },
   gridCell: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
     position: 'relative',
-  },
-  tabEmptyContainer: {
-    padding: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
   },
   gridImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  gridPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reelOverlay: {
     position: 'absolute',
@@ -520,15 +683,28 @@ const styles = StyleSheet.create({
     left: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(8, 6, 13, 0.7)',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: borderRadius.sm,
+    borderRadius: 8,
+    gap: 3,
   },
   reelViews: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
-    marginLeft: 3,
+  },
+  tabEmptyContainer: {
+    paddingVertical: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabEmptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
 });

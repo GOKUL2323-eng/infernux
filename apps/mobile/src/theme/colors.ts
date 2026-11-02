@@ -5,6 +5,11 @@ export interface ThemeColors {
   secondary: string;
   accent: string;
 
+  // Dark-Purple Design Tokens
+  primaryPurple: string;
+  secondaryPurple: string;
+  pinkAccent: string;
+
   background: string;
   surface: string;
   surfaceElevated: string;
@@ -26,71 +31,56 @@ export interface ThemeColors {
   offline: string;
 
   gradientPrimary: [string, string];
+  gradientAccent: [string, string, string];
   gradientDark: [string, string];
+  gradientCard: [string, string];
   glassOverlay: string;
+  neonGlow: string;
+  neonPinkGlow: string;
 }
 
 export const darkColors: ThemeColors = {
-  primary: '#FF3B30',
-  primaryLight: '#FF6B6B',
-  primaryDark: '#D32F2F',
-  secondary: '#8A2BE2',
-  accent: '#00D2FF',
+  primary: '#A020F0',          // Primary Purple
+  primaryLight: '#C026D3',     // Secondary Purple
+  primaryDark: '#7B0FBB',      // Deep Purple
+  secondary: '#C026D3',        // Magenta / Secondary Purple
+  accent: '#F04BBE',           // Pink Accent
 
-  background: '#090A0F',
-  surface: '#12131A',
-  surfaceElevated: '#1A1C26',
-  card: '#151620',
-  border: '#232533',
-  divider: '#1E202C',
+  primaryPurple: '#A020F0',
+  secondaryPurple: '#C026D3',
+  pinkAccent: '#F04BBE',
 
-  text: '#FFFFFF',
-  textSecondary: '#A0A3BD',
-  textMuted: '#6B6E82',
-  textInverse: '#090A0F',
+  background: '#08060D',       // Primary Deep Black Background
+  surface: '#15101D',          // Secondary Background
+  surfaceElevated: '#21152B',  // Card Background / Elevated Surface
+  card: '#21152B',             // Card Background
+  border: '#30233B',           // Subtle Dark Purple Border
+  divider: 'rgba(240, 75, 190, 0.12)',
+
+  text: '#FFFFFF',             // Primary Text
+  textSecondary: '#B7AFC0',     // Secondary Text
+  textMuted: '#7E7688',        // Muted Text
+  textInverse: '#08060D',
 
   success: '#00E676',
   warning: '#FFD600',
-  error: '#FF1744',
-  info: '#2979FF',
+  error: '#FF2A6D',
+  info: '#A020F0',
 
   online: '#00E676',
-  offline: '#6B6E82',
+  offline: '#7E7688',
 
-  gradientPrimary: ['#FF416C', '#FF4B2B'],
-  gradientDark: ['#12131A', '#090A0F'],
-  glassOverlay: 'rgba(255, 255, 255, 0.05)',
+  gradientPrimary: ['#A020F0', '#F04BBE'],
+  gradientAccent: ['#A020F0', '#C026D3', '#F04BBE'],
+  gradientDark: ['#15101D', '#08060D'],
+  gradientCard: ['#21152B', '#15101D'],
+  glassOverlay: 'rgba(33, 21, 43, 0.75)',
+  neonGlow: 'rgba(160, 32, 240, 0.35)',
+  neonPinkGlow: 'rgba(240, 75, 190, 0.35)',
 };
 
 export const lightColors: ThemeColors = {
-  primary: '#FF3B30',
-  primaryLight: '#FF6B6B',
-  primaryDark: '#D32F2F',
-  secondary: '#7B1FA2',
-  accent: '#0288D1',
-
-  background: '#F8F9FD',
-  surface: '#FFFFFF',
-  surfaceElevated: '#F1F3F9',
-  card: '#FFFFFF',
-  border: '#E2E6EF',
-  divider: '#ECEFF5',
-
-  text: '#11142D',
-  textSecondary: '#5A607F',
-  textMuted: '#8F95B2',
-  textInverse: '#FFFFFF',
-
-  success: '#00C853',
-  warning: '#FFAB00',
-  error: '#D50000',
-  info: '#1976D2',
-
-  online: '#00C853',
-  offline: '#8F95B2',
-
-  gradientPrimary: ['#FF416C', '#FF4B2B'],
-  gradientDark: ['#FFFFFF', '#F8F9FD'],
-  glassOverlay: 'rgba(0, 0, 0, 0.03)',
+  ...darkColors, // Dark-first social platform
 };
+
 

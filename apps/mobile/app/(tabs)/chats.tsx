@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useChatStore } from '../../src/store/useChatStore';
 import { useCallStore } from '../../src/store/useCallStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -239,11 +240,16 @@ export default function ChatsScreen() {
             </Text>
 
             {isUnread && (
-              <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
+              <LinearGradient
+                colors={colors.gradientPrimary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.unreadBadge}
+              >
                 <Text style={styles.unreadCountText}>
                   {item.unreadCount > 99 ? '99+' : item.unreadCount}
                 </Text>
-              </View>
+              </LinearGradient>
             )}
           </View>
         </View>
@@ -354,7 +360,7 @@ export default function ChatsScreen() {
       </View>
 
       {/* 2. Instagram-Style Rounded Search Field */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceElevated }]}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
         <Ionicons name="search" size={17} color={colors.textMuted} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
@@ -373,7 +379,7 @@ export default function ChatsScreen() {
 
       {/* 3. Online Friends / Active Contacts Horizontal Tray */}
       {activeContacts.length > 0 && (
-        <View style={styles.activeTrayContainer}>
+        <View style={[styles.activeTrayContainer, { borderBottomColor: colors.border }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -383,13 +389,18 @@ export default function ChatsScreen() {
             <TouchableOpacity
               style={styles.activeContactItem}
               activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/create' as any)}
+              onPress={() => router.push('/notes/social' as any)}
             >
               <View style={styles.activeAvatarWrapper}>
                 <Avatar url={user?.avatarUrl} name={user?.displayName || 'You'} size={56} />
-                <View style={[styles.addNoteBadge, { backgroundColor: colors.primary }]}>
+                <LinearGradient
+                  colors={colors.gradientPrimary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.addNoteBadge, { borderColor: colors.background }]}
+                >
                   <Ionicons name="add" size={12} color="#FFFFFF" />
-                </View>
+                </LinearGradient>
               </View>
               <Text numberOfLines={1} style={[styles.activeContactName, { color: colors.textSecondary }]}>
                 Your note
@@ -403,7 +414,7 @@ export default function ChatsScreen() {
       )}
 
       {/* 4. Segmented Sub-Tabs (Direct, Rooms, Calls) */}
-      <View style={[styles.tabsRow, { backgroundColor: colors.surfaceElevated }]}>
+      <View style={[styles.tabsRow, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
         <TouchableOpacity
           onPress={() => setActiveTab('direct')}
           style={[styles.tabBtn, activeTab === 'direct' && { backgroundColor: colors.surface }]}
@@ -413,7 +424,7 @@ export default function ChatsScreen() {
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'direct' ? colors.primary : colors.textSecondary,
+                color: activeTab === 'direct' ? colors.primaryLight : colors.textSecondary,
                 fontWeight: activeTab === 'direct' ? '700' : '600',
               },
             ]}
@@ -431,7 +442,7 @@ export default function ChatsScreen() {
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'rooms' ? colors.primary : colors.textSecondary,
+                color: activeTab === 'rooms' ? colors.primaryLight : colors.textSecondary,
                 fontWeight: activeTab === 'rooms' ? '700' : '600',
               },
             ]}
@@ -449,7 +460,7 @@ export default function ChatsScreen() {
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'calls' ? colors.primary : colors.textSecondary,
+                color: activeTab === 'calls' ? colors.primaryLight : colors.textSecondary,
                 fontWeight: activeTab === 'calls' ? '700' : '600',
               },
             ]}
