@@ -7,12 +7,15 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Modal,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useNativeDriver } from '../../utils/animationHelper';
 import { typography, spacing } from '../../theme/spacing';
 
-const { width, height } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('screen');
 
 interface SplashScreenViewProps {
   isReady: boolean;
@@ -25,6 +28,7 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
 }) => {
   const { colors, isDarkMode } = useThemeStore();
   const [isRendered, setIsRendered] = useState(true);
+  const hasExitedRef = useRef(false);
 
   // Animated values
   const logoFade = useRef(new Animated.Value(0)).current;
@@ -34,12 +38,27 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
   const textTranslateY = useRef(new Animated.Value(14)).current;
   const containerFade = useRef(new Animated.Value(1)).current;
 
+  const performExit = () => {
+    if (hasExitedRef.current) return;
+    hasExitedRef.current = true;
+
+    Animated.timing(containerFade, {
+      toValue: 0,
+      duration: 350,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver,
+    }).start(() => {
+      setIsRendered(false);
+      onAnimationComplete?.();
+    });
+  };
+
   useEffect(() => {
     // 1. Entrance sequence: Logo fade in + subtle scale-up + soft glow + name appearance
     Animated.parallel([
       Animated.timing(logoFade, {
         toValue: 1,
-        duration: 700,
+        duration: 650,
         easing: Easing.out(Easing.cubic),
         useNativeDriver,
       }),
@@ -51,46 +70,43 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
       }),
       Animated.timing(glowOpacity, {
         toValue: isDarkMode ? 0.45 : 0.25,
-        duration: 900,
+        duration: 850,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver,
       }),
       Animated.sequence([
-        Animated.delay(250),
+        Animated.delay(200),
         Animated.parallel([
           Animated.timing(textFade, {
             toValue: 1,
-            duration: 600,
+            duration: 550,
             easing: Easing.out(Easing.cubic),
             useNativeDriver,
           }),
           Animated.timing(textTranslateY, {
             toValue: 0,
-            duration: 600,
+            duration: 550,
             easing: Easing.out(Easing.cubic),
             useNativeDriver,
           }),
         ]),
       ]),
     ]).start();
+
+    // 2. Guaranteed fallback timeout: splash NEVER hangs indefinitely!
+    const fallbackTimer = setTimeout(() => {
+      performExit();
+    }, 1200);
+
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
-  // 2. When app initialization is ready, perform a smooth exit transition
+  // 3. When app initialization is ready, perform a smooth exit transition
   useEffect(() => {
     if (isReady) {
       const exitTimer = setTimeout(() => {
-        Animated.timing(containerFade, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver,
-        }).start(() => {
-          setIsRendered(false);
-          if (onAnimationComplete) {
-            onAnimationComplete();
-          }
-        });
-      }, 350); // slight grace duration to allow entrance appreciation without lag
+        performExit();
+      }, 300);
 
       return () => clearTimeout(exitTimer);
     }
@@ -99,78 +115,87 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
   if (!isRendered) return null;
 
   return (
-    <Animated.View
-      pointerEvents={isReady ? 'none' : 'auto'}
-      style={[
-        StyleSheet.absoluteFill,
-        styles.container,
-        {
-          backgroundColor: colors.background,
-          opacity: containerFade,
-          zIndex: 99999,
-        },
-      ]}
+    <Modal
+      visible={isRendered}
+      transparent={true}
+      statusBarTranslucent={true}
+      animationType="none"
+      onRequestClose={performExit}
     >
-      {/* Soft background glow behind logo */}
+      <StatusBar style="light" />
       <Animated.View
+        pointerEvents={hasExitedRef.current ? 'none' : 'auto'}
         style={[
-          styles.glowCircle,
+          styles.container,
           {
-            backgroundColor: colors.primary,
-            opacity: glowOpacity,
-          },
-        ]}
-      />
-
-      {/* Brand Logo with scale & fade */}
-      <Animated.View
-        style={[
-          styles.logoContainer,
-          {
-            opacity: logoFade,
-            transform: [{ scale: logoScale }],
+            backgroundColor: colors.background,
+            opacity: containerFade,
           },
         ]}
       >
-        <Image
-          source={require('../../../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
+        {/* Soft background glow behind logo */}
+        <Animated.View
+          style={[
+            styles.glowCircle,
+            {
+              backgroundColor: colors.primary,
+              opacity: glowOpacity,
+            },
+          ]}
         />
-      </Animated.View>
 
-      {/* Brand Name & Tagline */}
-      <Animated.View
-        style={[
-          styles.textContainer,
-          {
-            opacity: textFade,
-            transform: [{ translateY: textTranslateY }],
-          },
-        ]}
-      >
-        <Text style={[styles.brandTitle, { color: colors.text }]}>MOZHI</Text>
-        <Text style={[styles.tagline, { color: colors.textSecondary }]}>
-          CONNECT • SHARE • ELEVATE
-        </Text>
+        {/* Brand Logo with scale & fade */}
+        <Animated.View
+          style={[
+            styles.logoContainer,
+            {
+              opacity: logoFade,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </Animated.View>
+
+        {/* Brand Name & Tagline */}
+        <Animated.View
+          style={[
+            styles.textContainer,
+            {
+              opacity: textFade,
+              transform: [{ translateY: textTranslateY }],
+            },
+          ]}
+        >
+          <Text style={[styles.brandTitle, { color: colors.text }]}>MOZHI</Text>
+          <Text style={[styles.tagline, { color: colors.textSecondary }]}>
+            CONNECT • SHARE • ELEVATE
+          </Text>
+        </Animated.View>
       </Animated.View>
-    </Animated.View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width,
-    height,
+    ...StyleSheet.absoluteFillObject,
+    width: screenWidth,
+    height: screenHeight,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 999999,
+    elevation: 999999,
   },
   glowCircle: {
     position: 'absolute',
     width: 220,
     height: 220,
     borderRadius: 110,
-    filter: 'blur(40px)',
   },
   logoContainer: {
     width: 110,
@@ -201,4 +226,3 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
-

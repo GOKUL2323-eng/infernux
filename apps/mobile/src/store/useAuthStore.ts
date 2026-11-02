@@ -193,53 +193,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   restoreSession: async () => {
-    let token = await getAccessToken();
+    try {
+      let token = await getAccessToken();
 
-    // If access token is absent or potentially expired, attempt refresh first
-    if (!token) {
-      const refreshToken = await getRefreshToken();
-      if (refreshToken) {
-        try {
-          const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
-          });
-          if (refreshRes.ok) {
-            const refreshData = await refreshRes.json();
-            if (refreshData.success && refreshData.data) {
-              await setAuthTokens(refreshData.data.accessToken, refreshData.data.refreshToken);
-              token = refreshData.data.accessToken;
+      // If access token is absent or potentially expired, attempt refresh first
+      if (!token) {
+        const refreshToken = await getRefreshToken();
+        if (refreshToken) {
+          try {
+            const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            });
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              if (refreshData.success && refreshData.data) {
+                await setAuthTokens(refreshData.data.accessToken, refreshData.data.refreshToken);
+                token = refreshData.data.accessToken;
+              }
             }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
         }
       }
-    }
 
-    if (!token) {
-      set({ isLoading: false, isAuthenticated: false, user: null });
-      return false;
-    }
+      if (!token) {
+        set({ isLoading: false, isAuthenticated: false, user: null });
+        return false;
+      }
 
-    const res = await api.get<UserProfile>('/auth/me');
-    if (res.success && res.data) {
-      await saveLastAccount({
-        username: res.data.username,
-        displayName: res.data.displayName,
-        avatarUrl: res.data.avatarUrl,
-      });
-      set({ user: res.data, isAuthenticated: true, isLoading: false });
-      socketClient.connect();
-      useChatStore.getState().loadConversations();
-      useFeedStore.getState().loadFeed(true);
-      useFeedStore.getState().loadStories();
-      return true;
-    } else {
+      const res = await api.get<UserProfile>('/auth/me');
+      if (res.success && res.data) {
+        await saveLastAccount({
+          username: res.data.username,
+          displayName: res.data.displayName,
+          avatarUrl: res.data.avatarUrl,
+        });
+        set({ user: res.data, isAuthenticated: true, isLoading: false });
+        socketClient.connect();
+        useChatStore.getState().loadConversations();
+        useFeedStore.getState().loadFeed(true);
+        useFeedStore.getState().loadStories();
+        return true;
+      } else {
+        await clearAuthTokens();
+        set({ user: null, isAuthenticated: false, isLoading: false });
+        return false;
+      }
+    } catch {
       await clearAuthTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
       return false;
+    } finally {
+      // Guaranteed safety: isLoading is always marked false
+      set((state) => (state.isLoading ? { isLoading: false } : {}));
     }
   },
 
