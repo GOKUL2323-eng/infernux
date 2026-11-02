@@ -15,6 +15,7 @@ import { Avatar } from '../Avatar';
 import { useThemeStore } from '../../store/useThemeStore';
 import { spacing, borderRadius, typography } from '../../theme/spacing';
 import { CallSession } from '@infernux/shared';
+import { useNativeDriver } from '../../utils/animationHelper';
 
 interface IncomingCallAlertProps {
   incomingCall: CallSession | null;
@@ -55,7 +56,7 @@ export const IncomingCallAlert: React.FC<IncomingCallAlertProps> = ({
             toValue: 1,
             duration: 2000,
             easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ])
       );
@@ -72,13 +73,13 @@ export const IncomingCallAlert: React.FC<IncomingCallAlertProps> = ({
           toValue: 1.06,
           duration: 900,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(avatarPulse, {
           toValue: 1,
           duration: 900,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );
@@ -108,13 +109,13 @@ export const IncomingCallAlert: React.FC<IncomingCallAlertProps> = ({
       Animated.timing(btnScaleAccept, {
         toValue: 0.85,
         duration: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(btnScaleAccept, {
         toValue: 1,
         friction: 4,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start(() => {
       onAccept();
@@ -131,13 +132,13 @@ export const IncomingCallAlert: React.FC<IncomingCallAlertProps> = ({
       Animated.timing(btnScaleReject, {
         toValue: 0.85,
         duration: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(btnScaleReject, {
         toValue: 1,
         friction: 4,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start(() => {
       onReject();

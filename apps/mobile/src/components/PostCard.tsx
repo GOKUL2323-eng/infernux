@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from './Avatar';
 import { DoubleTapLikeOverlay } from './common/DoubleTapLikeOverlay';
 import { AnimatedLikeButton } from './common/AnimatedLikeButton';
+import { sanitizeMediaUrl } from '../utils/uploadHelper';
 import { useThemeStore } from '../store/useThemeStore';
 import { spacing, typography } from '../theme/spacing';
 import { PostSummary } from '@infernux/shared';
@@ -62,7 +63,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           style={styles.mediaContainer}
         >
           <Image
-            source={{ uri: primaryMedia.url }}
+            source={{ uri: sanitizeMediaUrl(primaryMedia.url) }}
             style={[styles.media, { backgroundColor: colors.surfaceElevated }]}
           />
           {primaryMedia.type === 'video' && (

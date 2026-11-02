@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useNativeDriver } from '../../utils/animationHelper';
 import { typography, spacing } from '../../theme/spacing';
 
 const { width, height } = Dimensions.get('window');
@@ -40,19 +41,19 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
         toValue: 1,
         duration: 700,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(logoScale, {
         toValue: 1,
         friction: 6,
         tension: 40,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(glowOpacity, {
         toValue: isDarkMode ? 0.45 : 0.25,
         duration: 900,
         easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.sequence([
         Animated.delay(250),
@@ -61,13 +62,13 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
             toValue: 1,
             duration: 600,
             easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.timing(textTranslateY, {
             toValue: 0,
             duration: 600,
             easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]),
       ]),
@@ -82,7 +83,7 @@ export const SplashScreenView: React.FC<SplashScreenViewProps> = ({
           toValue: 0,
           duration: 400,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }).start(() => {
           setIsRendered(false);
           if (onAnimationComplete) {
@@ -200,3 +201,4 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
+

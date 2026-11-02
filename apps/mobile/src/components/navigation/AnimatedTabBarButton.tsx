@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useNativeDriver } from '../../utils/animationHelper';
 
 interface AnimatedTabBarButtonProps {
   children: React.ReactNode;
@@ -40,13 +41,13 @@ export const AnimatedTabBarButton: React.FC<AnimatedTabBarButtonProps> = ({
         toValue: focused ? 1.1 : 1,
         friction: 5,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(indicatorAnim, {
         toValue: focused ? 1 : 0,
         friction: 6,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
   }, [focused]);
@@ -56,7 +57,7 @@ export const AnimatedTabBarButton: React.FC<AnimatedTabBarButtonProps> = ({
       toValue: 0.9,
       friction: 6,
       tension: 120,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
   };
 
@@ -65,7 +66,7 @@ export const AnimatedTabBarButton: React.FC<AnimatedTabBarButtonProps> = ({
       toValue: 1,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
   };
 
@@ -138,3 +139,4 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
+

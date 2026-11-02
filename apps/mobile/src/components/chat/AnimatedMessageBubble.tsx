@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, ViewStyle } from 'react-native';
+import { useNativeDriver } from '../../utils/animationHelper';
 
 interface AnimatedMessageBubbleProps {
   children: React.ReactNode;
@@ -40,19 +41,19 @@ export const AnimatedMessageBubble: React.FC<AnimatedMessageBubbleProps> = ({
           toValue: 1,
           duration: 220,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
           friction: 6,
           tension: 100,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(translateAnim, {
           toValue: 0,
           duration: 200,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]).start();
     } else {
@@ -62,19 +63,19 @@ export const AnimatedMessageBubble: React.FC<AnimatedMessageBubbleProps> = ({
           toValue: 1,
           duration: 240,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(translateAnim, {
           toValue: 0,
           duration: 240,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
           friction: 7,
           tension: 90,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]).start();
     }
@@ -99,3 +100,4 @@ export const AnimatedMessageBubble: React.FC<AnimatedMessageBubbleProps> = ({
     </Animated.View>
   );
 };
+

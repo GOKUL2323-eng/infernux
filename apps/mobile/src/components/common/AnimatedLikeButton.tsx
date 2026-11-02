@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useNativeDriver } from '../../utils/animationHelper';
 import { typography } from '../../theme/spacing';
 
 interface AnimatedLikeButtonProps {
@@ -53,19 +54,19 @@ export const AnimatedLikeButton: React.FC<AnimatedLikeButtonProps> = ({
           Animated.timing(iconScale, {
             toValue: 0.7,
             duration: 70,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(iconScale, {
             toValue: 1.3,
             friction: 3,
             tension: 140,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(iconScale, {
             toValue: 1,
             friction: 4,
             tension: 80,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]).start();
 
@@ -74,13 +75,13 @@ export const AnimatedLikeButton: React.FC<AnimatedLikeButtonProps> = ({
           Animated.timing(countScale, {
             toValue: 0.8,
             duration: 80,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(countScale, {
             toValue: 1,
             friction: 4,
             tension: 100,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]).start();
       } else {
@@ -89,13 +90,13 @@ export const AnimatedLikeButton: React.FC<AnimatedLikeButtonProps> = ({
           Animated.timing(iconScale, {
             toValue: 0.88,
             duration: 90,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(iconScale, {
             toValue: 1,
             friction: 5,
             tension: 100,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]).start();
       }
@@ -193,3 +194,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

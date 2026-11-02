@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useNativeDriver } from '../../utils/animationHelper';
 
 interface DoubleTapLikeOverlayProps {
   children: React.ReactNode;
@@ -47,7 +48,7 @@ export const DoubleTapLikeOverlay: React.FC<DoubleTapLikeOverlayProps> = ({
         toValue: 1.2,
         friction: 4,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.sequence([
         Animated.delay(450),
@@ -55,7 +56,7 @@ export const DoubleTapLikeOverlay: React.FC<DoubleTapLikeOverlayProps> = ({
           toValue: 0,
           duration: 300,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]),
     ]).start(() => {

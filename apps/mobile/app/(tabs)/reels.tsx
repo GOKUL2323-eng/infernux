@@ -29,7 +29,7 @@ export default function ReelsScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const {
     reels,
     loadReels,
@@ -56,8 +56,10 @@ export default function ReelsScreen() {
 
   // Initial load
   useEffect(() => {
-    loadReels();
-  }, [user?.id]);
+    if (isAuthenticated) {
+      loadReels();
+    }
+  }, [isAuthenticated, user?.id]);
 
   // AppState listener to pause playback when app is backgrounded
   useEffect(() => {

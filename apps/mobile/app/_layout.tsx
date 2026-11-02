@@ -38,6 +38,26 @@ export default function RootLayout() {
         // ignore
       }
     }
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+        const reason = event?.reason;
+        const name = reason?.name || '';
+        const message = String(reason?.message || reason || '');
+        if (
+          name === 'NotSupportedError' ||
+          name === 'NotAllowedError' ||
+          message.includes('no supported source was found') ||
+          message.includes('play() request was interrupted')
+        ) {
+          event.preventDefault?.();
+        }
+      };
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
+      return () => {
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      };
+    }
   }, []);
 
   useEffect(() => {

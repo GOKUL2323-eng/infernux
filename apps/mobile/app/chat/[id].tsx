@@ -41,7 +41,8 @@ import {
   AnimatedReactionButton,
 } from '../../src/components/chat/AnimatedReactionBadge';
 import { socketClient } from '../../src/socket/socketClient';
-import { uploadMediaAsset } from '../../src/utils/uploadHelper';
+import { uploadMediaAsset, sanitizeMediaUrl } from '../../src/utils/uploadHelper';
+import { useNativeDriver } from '../../src/utils/animationHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 import { MessageSummary } from '@infernux/shared';
 
@@ -170,12 +171,12 @@ export default function ChatScreen() {
           Animated.timing(recordingPulse, {
             toValue: 0.25,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.timing(recordingPulse, {
             toValue: 1,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ])
       ).start();
@@ -376,7 +377,7 @@ export default function ChatScreen() {
               /* 3. Image Attachment Message */
               <View>
                 <Image
-                  source={{ uri: item.attachments[0].url }}
+                  source={{ uri: sanitizeMediaUrl(item.attachments[0].url) }}
                   style={styles.attachmentImage}
                   resizeMode="cover"
                 />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Image, StyleSheet, Text } from 'react-native';
+import { View, Image, StyleSheet, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/useThemeStore';
 
@@ -20,6 +20,9 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const { colors } = useThemeStore();
 
+  const isLocalFileOnWeb = Platform.OS === 'web' && !!url && url.startsWith('file://');
+  const validUrl = isLocalFileOnWeb ? undefined : url;
+
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -29,9 +32,9 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <View style={{ width: size, height: size, position: 'relative' }}>
-      {url ? (
+      {validUrl ? (
         <Image
-          source={{ uri: url }}
+          source={{ uri: validUrl }}
           style={[
             styles.image,
             { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceElevated },

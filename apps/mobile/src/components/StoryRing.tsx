@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from './Avatar';
 import { useThemeStore } from '../store/useThemeStore';
+import { useNativeDriver } from '../utils/animationHelper';
 import { typography, spacing } from '../theme/spacing';
 import { UserSummary } from '@infernux/shared';
 
@@ -34,7 +35,7 @@ export const StoryRing: React.FC<StoryRingProps> = ({
           toValue: 1,
           duration: 6000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver,
         })
       );
       loopAnimation.start();
@@ -53,7 +54,7 @@ export const StoryRing: React.FC<StoryRingProps> = ({
       toValue: 0.93,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
   };
 
@@ -62,7 +63,7 @@ export const StoryRing: React.FC<StoryRingProps> = ({
       toValue: 1,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
   };
 

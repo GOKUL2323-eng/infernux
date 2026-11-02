@@ -27,7 +27,7 @@ type ChatTab = 'direct' | 'rooms' | 'calls';
 export default function ChatsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { colors } = useThemeStore();
   const { conversations, loadConversations, isLoading } = useChatStore();
   const { initiateCall } = useCallStore();
@@ -38,9 +38,11 @@ export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    loadConversations();
-    fetchCallHistory();
-  }, [user?.id]);
+    if (isAuthenticated) {
+      loadConversations();
+      fetchCallHistory();
+    }
+  }, [isAuthenticated, user?.id]);
 
   const fetchCallHistory = async () => {
     const res = await api.get<CallSession[]>('/calls/history?limit=30');

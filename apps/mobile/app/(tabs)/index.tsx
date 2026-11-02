@@ -26,7 +26,7 @@ import { PostSummary } from '@infernux/shared';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { colors } = useThemeStore();
   const {
     posts,
@@ -43,9 +43,11 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'following'>('all');
 
   useEffect(() => {
-    loadFeed(true);
-    loadStories();
-  }, [user?.id]);
+    if (isAuthenticated) {
+      loadFeed(true);
+      loadStories();
+    }
+  }, [isAuthenticated, user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);

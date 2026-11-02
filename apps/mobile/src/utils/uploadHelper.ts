@@ -9,6 +9,21 @@ export interface UploadAssetInput {
   fileName?: string | null;
 }
 
+export const DEFAULT_FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800';
+
+/**
+ * Sanitizes any media URL so local file:// paths never cause browser security errors on web.
+ */
+export function sanitizeMediaUrl(url?: string | null, fallback = DEFAULT_FALLBACK_IMAGE): string {
+  if (!url || typeof url !== 'string' || !url.trim()) return fallback;
+  const clean = url.trim();
+  if (Platform.OS === 'web' && clean.startsWith('file://')) {
+    return fallback;
+  }
+  return clean;
+}
+
 /**
  * Uploads a local file asset (from ImagePicker or Audio recording) to the MOZHI media server
  * and returns the persistent HTTP / Cloudinary URL.
@@ -57,11 +72,10 @@ export async function uploadMediaAsset(asset: UploadAssetInput): Promise<string>
       return res.data.url;
     }
 
-    console.warn('Media upload did not return URL, falling back to local URI:', res.error);
-    return asset.uri;
-  } catch (err) {
-    console.warn('Failed to upload media asset, falling back:', err);
-    return asset.uri;
+    throw new Error(res.error?.message || 'Media upload failed on server');
+  } catch (err: any) {
+    console.error('Failed to upload media asset:', err);
+    throw new Error(err.message || 'Media upload failed');
   }
 }
 

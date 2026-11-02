@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native
 import * as Haptics from 'expo-haptics';
 import { MessageReaction } from '@infernux/shared';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useNativeDriver } from '../../utils/animationHelper';
 import { typography } from '../../theme/spacing';
 
 interface AnimatedReactionBadgeProps {
@@ -34,26 +35,26 @@ export const AnimatedReactionBadge: React.FC<AnimatedReactionBadgeProps> = ({
           Animated.timing(scaleAnim, {
             toValue: 1.25,
             duration: 120,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(scaleAnim, {
             toValue: 1,
             friction: 4,
             tension: 80,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]),
         Animated.sequence([
           Animated.timing(countScaleAnim, {
             toValue: 0.8,
             duration: 80,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.spring(countScaleAnim, {
             toValue: 1,
             friction: 5,
             tension: 100,
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ]),
       ]).start();
@@ -132,25 +133,25 @@ export const AnimatedReactionButton: React.FC<AnimatedReactionButtonProps> = ({
           toValue: 1.45,
           friction: 3,
           tension: 120,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
           friction: 4,
           tension: 80,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]),
       Animated.sequence([
         Animated.timing(floatAnim, {
           toValue: -14,
           duration: 120,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
           duration: 160,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]),
     ]).start(() => {

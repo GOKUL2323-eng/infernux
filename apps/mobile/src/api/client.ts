@@ -160,6 +160,21 @@ async function request<T>(
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
   const token = await getAccessToken();
 
+  // If endpoint is a protected route and user is completely unauthenticated, avoid redundant network 401
+  const isPublicAuthRoute =
+    endpoint.includes('/auth/login') ||
+    endpoint.includes('/auth/register') ||
+    endpoint.includes('/auth/phone/') ||
+    endpoint.includes('/auth/refresh-token') ||
+    endpoint === '/health';
+
+  if (!token && !isPublicAuthRoute) {
+    return {
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'User not authenticated' },
+    };
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',

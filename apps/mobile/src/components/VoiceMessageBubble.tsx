@@ -4,6 +4,7 @@ import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../store/useThemeStore';
+import { useNativeDriver } from '../utils/animationHelper';
 import { spacing, borderRadius, typography } from '../theme/spacing';
 
 interface VoiceMessageBubbleProps {
@@ -47,13 +48,13 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
             toValue: 1.35,
             duration: 250,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver,
           }),
           Animated.timing(pulseAnim, {
             toValue: 0.85,
             duration: 250,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver,
           }),
         ])
       );
@@ -96,13 +97,13 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
       Animated.timing(playBtnScale, {
         toValue: 0.85,
         duration: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(playBtnScale, {
         toValue: 1,
         friction: 4,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
 

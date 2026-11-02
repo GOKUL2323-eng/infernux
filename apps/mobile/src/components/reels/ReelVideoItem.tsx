@@ -21,6 +21,7 @@ import { AnimatedLikeButton } from '../common/AnimatedLikeButton';
 import { useFeedStore } from '../../store/useFeedStore';
 import { spacing, typography } from '../../theme/spacing';
 import { ReelSummary } from '@infernux/shared';
+import { useNativeDriver } from '../../utils/animationHelper';
 
 interface ReelVideoItemProps {
   item: ReelSummary;
@@ -78,9 +79,16 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   // Video Player initialization
   const player = useVideoPlayer(item.videoUrl, (p) => {
     p.loop = true;
-    p.muted = isMuted;
+    p.muted = Platform.OS === 'web' ? true : isMuted;
     if (isActive && isAppActive && !paused) {
-      p.play();
+      try {
+        const res = (p as any).play();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      } catch {
+        // Safe catch for autoplay constraints
+      }
     }
   });
 
@@ -97,7 +105,14 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
 
     if (isActive && isAppActive && !paused) {
       setPlaybackError(false);
-      player.play();
+      try {
+        const res = (player as any).play();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      } catch {
+        // Safe catch for autoplay constraints
+      }
 
       // Record view after 1.5 seconds of active watch time
       if (!viewTimerRef.current) {
@@ -106,7 +121,11 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
         }, 1500);
       }
     } else {
-      player.pause();
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
       if (viewTimerRef.current) {
         clearTimeout(viewTimerRef.current);
         viewTimerRef.current = null;
@@ -130,7 +149,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           toValue: 1,
           duration: 4000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver,
         })
       );
       animation.start();
@@ -173,7 +192,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     Animated.timing(playBadgeAnim, {
       toValue: 0,
       duration: 650,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start(() => setShowPlayPauseBadge(false));
   };
 
@@ -197,14 +216,14 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
       Animated.spring(heartScaleAnim, {
         toValue: 1.25,
         friction: 3,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.sequence([
         Animated.delay(500),
         Animated.timing(heartOpacityAnim, {
           toValue: 0,
           duration: 350,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]),
     ]).start(() => {
@@ -224,7 +243,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     Animated.spring(likeScaleAnim, {
       toValue: 1,
       friction: 3,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
 
     likeReel(item.id);
