@@ -140,3 +140,4 @@ const htmlContent = `<!DOCTYPE html>
 const viewerPath = path.join(ARTIFACT_DIR, 'expo-qr-viewer.html');
 fs.writeFileSync(viewerPath, htmlContent, 'utf8');
 console.log(`Wrote Viewer HTML to ${viewerPath}`);
+
