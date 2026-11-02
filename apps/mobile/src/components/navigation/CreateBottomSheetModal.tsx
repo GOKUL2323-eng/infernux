@@ -80,6 +80,7 @@ export const CreateBottomSheetModal: React.FC = () => {
   }, [isOpen]);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const backAction = () => {
       if (isOpen) {
         close();

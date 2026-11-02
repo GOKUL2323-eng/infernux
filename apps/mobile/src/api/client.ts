@@ -5,6 +5,12 @@ import { ApiResponse } from '@infernux/shared';
 
 function resolveApiBaseUrl(): string {
   if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location) {
+      const hostname = window.location.hostname;
+      if (hostname) {
+        return `http://${hostname}:4000/api/v1`;
+      }
+    }
     return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
   }
 
@@ -17,7 +23,7 @@ function resolveApiBaseUrl(): string {
     }
   }
 
-  // 2. Check experienceUrl (e.g. exp://192.168.1.10:8081)
+  // 2. Check experienceUrl (e.g. exp://192.168.1.11:8081)
   const expUrl = (Constants as any).experienceUrl;
   if (typeof expUrl === 'string') {
     const match = expUrl.match(/:\/\/([^:/]+)/);
@@ -40,7 +46,7 @@ function resolveApiBaseUrl(): string {
     return process.env.EXPO_PUBLIC_LAN_API_URL;
   }
 
-  return 'http://192.168.1.10:4000/api/v1';
+  return 'http://192.168.1.11:4000/api/v1';
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
@@ -236,11 +242,19 @@ async function request<T>(
     const data: ApiResponse<T> = await response.json();
     return data;
   } catch (error: any) {
+    const rawMsg = String(error?.message || '');
+    const isOfflineOrRefused =
+      rawMsg === 'Failed to fetch' ||
+      rawMsg.includes('Network request failed') ||
+      rawMsg.includes('NetworkError') ||
+      rawMsg.includes('connect ECONNREFUSED');
     return {
       success: false,
       error: {
         code: 'NETWORK_ERROR',
-        message: error.message || 'Unable to connect to MOZHI servers',
+        message: isOfflineOrRefused
+          ? 'Unable to connect to MOZHI API server. Please ensure the backend server is running.'
+          : rawMsg || 'Unable to connect to MOZHI servers',
       },
     };
   }
