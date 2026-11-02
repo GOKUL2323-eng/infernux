@@ -67,7 +67,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   const [playbackError, setPlaybackError] = useState(false);
   const [currentPlaybackPosition, setCurrentPlaybackPosition] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [indicatorType, setIndicatorType] = useState<'play' | 'pause' | null>(null);
+  const [showResumeAnim, setShowResumeAnim] = useState(false);
 
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [showHeartAnim, setShowHeartAnim] = useState(false);
@@ -77,8 +77,10 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   const heartOpacityAnim = useRef(new Animated.Value(0)).current;
   const discSpinAnim = useRef(new Animated.Value(0)).current;
   const likeScaleAnim = useRef(new Animated.Value(1)).current;
-  const indicatorScaleAnim = useRef(new Animated.Value(0.5)).current;
-  const indicatorOpacityAnim = useRef(new Animated.Value(0)).current;
+  const playBadgeScale = useRef(new Animated.Value(0.6)).current;
+  const playBadgeOpacity = useRef(new Animated.Value(0)).current;
+  const resumeBadgeScale = useRef(new Animated.Value(0.7)).current;
+  const resumeBadgeOpacity = useRef(new Animated.Value(0)).current;
 
   // Double tap detection
   const lastTapRef = useRef<number>(0);
@@ -153,9 +155,36 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   useEffect(() => {
     if (!isActive) {
       setUserPaused(false);
-      setIndicatorType(null);
+      setShowResumeAnim(false);
     }
   }, [isActive]);
+
+  // Synchronize play badge animation with paused state (Instagram Style)
+  useEffect(() => {
+    if (userPaused && isActive) {
+      playBadgeScale.setValue(0.6);
+      playBadgeOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(playBadgeScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 120,
+          useNativeDriver,
+        }),
+        Animated.timing(playBadgeOpacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver,
+        }),
+      ]).start();
+    } else {
+      Animated.timing(playBadgeOpacity, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver,
+      }).start();
+    }
+  }, [userPaused, isActive]);
 
   // Orchestrate Play/Pause: only active, focused, active app, not user-paused
   const shouldPlay = isActive && isScreenFocused && isAppActive && !userPaused;
@@ -217,33 +246,6 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     };
   }, [shouldPlay]);
 
-  const showIndicator = (type: 'play' | 'pause') => {
-    setIndicatorType(type);
-    indicatorScaleAnim.setValue(0.5);
-    indicatorOpacityAnim.setValue(1);
-
-    Animated.parallel([
-      Animated.spring(indicatorScaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 90,
-        useNativeDriver,
-      }),
-      Animated.sequence([
-        Animated.delay(700),
-        Animated.timing(indicatorOpacityAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver,
-        }),
-      ]),
-    ]).start(({ finished }) => {
-      if (finished) {
-        setIndicatorType(null);
-      }
-    });
-  };
-
   // Tap handler: single tap = toggle pause/play; double tap = Instagram heart burst!
   const handleTouch = () => {
     const now = Date.now();
@@ -279,13 +281,35 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
     try {
       if (nextPaused) {
         player.pause();
-        showIndicator('play');
       } else {
         const res = (player as any).play();
         if (res && typeof res.catch === 'function') {
           res.catch(() => {});
         }
-        showIndicator('pause');
+        // Instagram-style brief resume indicator: scale up + smooth fadeout
+        setShowResumeAnim(true);
+        resumeBadgeScale.setValue(0.7);
+        resumeBadgeOpacity.setValue(1);
+        Animated.parallel([
+          Animated.spring(resumeBadgeScale, {
+            toValue: 1.15,
+            friction: 5,
+            tension: 100,
+            useNativeDriver,
+          }),
+          Animated.sequence([
+            Animated.delay(450),
+            Animated.timing(resumeBadgeOpacity, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver,
+            }),
+          ]),
+        ]).start(({ finished }) => {
+          if (finished) {
+            setShowResumeAnim(false);
+          }
+        });
       }
     } catch {
       // safe ignore
@@ -408,23 +432,44 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
           </View>
         )}
 
-        {/* Play / Pause Animated Center Badge */}
-        {indicatorType && (
+        {/* Play Centered Badge: Visible while video is paused (Instagram Style) */}
+        {userPaused && isActive && (
           <View style={styles.centeredBadge} pointerEvents="none">
             <Animated.View
               style={[
                 styles.badgeCircle,
                 {
-                  transform: [{ scale: indicatorScaleAnim }],
-                  opacity: indicatorOpacityAnim,
+                  transform: [{ scale: playBadgeScale }],
+                  opacity: playBadgeOpacity,
                 },
               ]}
             >
               <Ionicons
-                name={indicatorType === 'play' ? 'play' : 'pause'}
-                size={40}
-                color="rgba(255,255,255,0.95)"
-                style={indicatorType === 'play' ? { marginLeft: 4 } : undefined}
+                name="play"
+                size={48}
+                color="#FFFFFF"
+                style={{ marginLeft: 6 }}
+              />
+            </Animated.View>
+          </View>
+        )}
+
+        {/* Resume Indicator: Briefly flashes pause icon then smoothly fades out */}
+        {showResumeAnim && (
+          <View style={styles.centeredBadge} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.badgeCircle,
+                {
+                  transform: [{ scale: resumeBadgeScale }],
+                  opacity: resumeBadgeOpacity,
+                },
+              ]}
+            >
+              <Ionicons
+                name="pause"
+                size={42}
+                color="#FFFFFF"
               />
             </Animated.View>
           </View>
@@ -695,14 +740,14 @@ const styles = StyleSheet.create({
     zIndex: 16,
   },
   badgeCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   centeredHeartContainer: {
     ...StyleSheet.absoluteFill,
