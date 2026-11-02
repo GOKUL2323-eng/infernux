@@ -13,7 +13,7 @@ export const DEFAULT_FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'; // Dark purple abstract wallpaper
 
 export const DEFAULT_FALLBACK_VIDEO =
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+  'https://media.w3.org/2010/05/sintel/trailer.mp4';
 
 /**
  * Checks if a URI is a local device / sandboxed cache path (e.g. from an Android / iOS device ImagePicker)

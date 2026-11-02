@@ -9,7 +9,7 @@ const uri =
   'mongodb+srv://demontxt01_db_user1:130408go11@cluster0.hgzyvwa.mongodb.net/infernux?retryWrites=true&w=majority';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
-const FALLBACK_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+const FALLBACK_VIDEO = 'https://media.w3.org/2010/05/sintel/trailer.mp4';
 
 async function main() {
   console.log('Connecting to MongoDB Atlas...');
@@ -64,6 +64,8 @@ async function main() {
       { videoUrl: { $regex: '^file:' } },
       { videoUrl: { $regex: 'ImagePicker' } },
       { videoUrl: { $regex: 'ExperienceData' } },
+      { videoUrl: { $regex: 'commondatastorage' } },
+      { videoUrl: { $regex: 'storage.googleapis.com' } },
       { videoUrl: { $regex: '\\.jpe?g$' } },
       { videoUrl: { $regex: '\\.png$' } },
       { thumbnailUrl: { $regex: '^file:' } },

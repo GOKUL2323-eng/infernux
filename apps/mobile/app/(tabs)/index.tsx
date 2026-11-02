@@ -143,26 +143,7 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* 2. Social Notes Quick Banner */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => router.push('/notes/social' as any)}
-        style={[
-          styles.socialNoteBanner,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Ionicons name="sparkles" size={18} color={colors.accent} />
-        <Text style={[typography.body2, { color: colors.text, marginLeft: spacing.xs + 2, flex: 1, fontWeight: '600' }]}>
-          Social Notes: See what friends are thinking & listening to
-        </Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-      </TouchableOpacity>
-
-      {/* 3. Feed Filters */}
+      {/* 2. Feed Filters */}
       <View style={[styles.filterBar, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => setActiveFilter('all')}
@@ -291,17 +272,6 @@ const styles = StyleSheet.create({
   },
   storiesScroll: {
     paddingHorizontal: spacing.md,
-  },
-  socialNoteBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.sm + 4,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    borderRadius: 18,
-    borderWidth: 1,
   },
   filterBar: {
     flexDirection: 'row',

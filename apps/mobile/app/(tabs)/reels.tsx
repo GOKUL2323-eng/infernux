@@ -50,9 +50,9 @@ export default function ReelsScreen() {
   const [optionsReel, setOptionsReel] = useState<ReelSummary | null>(null);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
 
-  // Dynamic reel height: video spans from y=0 (behind transparent top nav) to bottom tab bar
-  const bottomTabBarHeight = 56 + (insets.bottom > 0 ? insets.bottom : 8);
-  const reelHeight = height - bottomTabBarHeight;
+  // Dynamic reel height: true edge-to-edge full screen
+  const bottomTabBarHeight = 58 + (insets.bottom > 0 ? insets.bottom : 8);
+  const reelHeight = height;
 
   // Initial load
   useEffect(() => {
@@ -115,6 +115,7 @@ export default function ReelsScreen() {
           isActive={isActive}
           reelHeight={reelHeight}
           reelWidth={width}
+          bottomTabBarHeight={bottomTabBarHeight}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
           onOpenComments={handleOpenComments}

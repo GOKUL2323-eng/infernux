@@ -30,6 +30,7 @@ interface ReelVideoItemProps {
   isActive: boolean;
   reelHeight: number;
   reelWidth: number;
+  bottomTabBarHeight?: number;
   isMuted: boolean;
   onToggleMute: () => void;
   onOpenComments: (reelId: string) => void;
@@ -45,6 +46,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
   isActive,
   reelHeight,
   reelWidth,
+  bottomTabBarHeight = 64,
   isMuted,
   onToggleMute,
   onOpenComments,
@@ -270,18 +272,20 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
         onPress={handleTouch}
         style={StyleSheet.absoluteFill}
       >
-        {shouldMountPlayer ? (
+        {/* 1. Instant high-res thumbnail behind VideoView so screen is never black */}
+        <Image
+          source={{ uri: sanitizeMediaUrl(item.thumbnailUrl || item.videoUrl) }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+
+        {/* 2. Video Player mounts smoothly over thumbnail */}
+        {shouldMountPlayer && (
           <VideoView
             player={player}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             nativeControls={false}
-          />
-        ) : (
-          <Image
-            source={{ uri: sanitizeMediaUrl(item.thumbnailUrl || item.videoUrl) }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
           />
         )}
 
@@ -374,7 +378,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
       </TouchableOpacity>
 
       {/* 2. Right-Side Action Panel (Instagram Style) */}
-      <View style={styles.rightActionsPanel}>
+      <View style={[styles.rightActionsPanel, { bottom: bottomTabBarHeight + 16 }]}>
         {/* Creator Avatar & Quick Follow Badge */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity
@@ -477,7 +481,7 @@ export const ReelVideoItem: React.FC<ReelVideoItemProps> = ({
       </View>
 
       {/* 3. Bottom-Left Creator Information (Instagram Style) */}
-      <View style={styles.bottomDetailsOverlay}>
+      <View style={[styles.bottomDetailsOverlay, { bottom: bottomTabBarHeight + 16 }]}>
         {/* Creator Name & Follow Button Row */}
         <View style={styles.creatorRow}>
           <TouchableOpacity

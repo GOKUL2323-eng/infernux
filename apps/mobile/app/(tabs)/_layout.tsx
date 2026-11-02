@@ -59,6 +59,18 @@ export default function TabLayout() {
           name="reels"
           options={{
             title: 'Reels',
+            tabBarStyle: {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(8, 6, 13, 0.45)',
+              borderTopWidth: 0,
+              elevation: 0,
+              height: tabHeight,
+              paddingBottom: bottomPadding,
+              paddingTop: 6,
+            },
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? 'play-circle' : 'play-circle-outline'}
