@@ -8,6 +8,13 @@ export const createRoomSchema = z.object({
   keyExpiresHours: z.number().int().positive().optional().nullable(),
   maxUses: z.number().int().positive().optional().nullable(),
   requiresApproval: z.boolean().optional().default(false),
+  disappearingMode: z.enum(['off', 'after_view', '24h', '7d']).optional().default('24h'),
+  mediaSavePolicy: z.enum(['view_only', 'allow_save', 'view_once', 'keep_in_chat']).optional().default('allow_save'),
+});
+
+export const updateRoomPrivacySettingsSchema = z.object({
+  disappearingMode: z.enum(['off', 'after_view', '24h', '7d']).optional(),
+  mediaSavePolicy: z.enum(['view_only', 'allow_save', 'view_once', 'keep_in_chat']).optional(),
 });
 
 export const joinRoomByKeySchema = z.object({
@@ -25,7 +32,8 @@ export const updateMemberRoleSchema = z.object({
   isMuted: z.boolean().optional(),
 });
 
-export type CreateRoomInput = z.infer<typeof createRoomSchema>;
+export type CreateRoomInput = z.input<typeof createRoomSchema>;
 export type JoinRoomByKeyInput = z.infer<typeof joinRoomByKeySchema>;
 export type RotateRoomKeyInput = z.infer<typeof rotateRoomKeySchema>;
 export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;
+export type UpdateRoomPrivacySettingsInput = z.infer<typeof updateRoomPrivacySettingsSchema>;

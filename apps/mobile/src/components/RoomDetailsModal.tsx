@@ -18,7 +18,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { Avatar } from './Avatar';
 import { RoomKeyBadge } from './RoomKeyBadge';
 import { spacing, borderRadius, typography } from '../theme/spacing';
-import { RoomDetails, RoomMember } from '@infernux/shared';
+import { RoomDetails, RoomMember, DisappearingMode, MediaSavePolicy } from '@infernux/shared';
 
 interface RoomDetailsModalProps {
   visible: boolean;
@@ -154,31 +154,59 @@ export const RoomDetailsModal: React.FC<RoomDetailsModalProps> = ({
     ]);
   };
 
+  const handleSelectDisappearingMode = async (mode: DisappearingMode) => {
+    if (!isAdmin) {
+      Alert.alert('Permission Denied', 'Only room administrators can update privacy settings.');
+      return;
+    }
+    const res = await api.patch<RoomDetails>(`/rooms/${roomId}/privacy`, { disappearingMode: mode });
+    if (res.success && res.data) {
+      setRoom((prev) => (prev ? { ...prev, disappearingMode: mode } : prev));
+      Alert.alert('Setting Updated', `Disappearing messages set to: ${mode === 'after_view' ? 'After viewing' : mode === '24h' ? '24 Hours' : mode === '7d' ? '7 Days' : 'Off'}`);
+    }
+  };
+
+  const handleSelectMediaSavePolicy = async (policy: MediaSavePolicy) => {
+    if (!isAdmin) {
+      Alert.alert('Permission Denied', 'Only room administrators can update media saving rules.');
+      return;
+    }
+    const res = await api.patch<RoomDetails>(`/rooms/${roomId}/privacy`, { mediaSavePolicy: policy });
+    if (res.success && res.data) {
+      setRoom((prev) => (prev ? { ...prev, mediaSavePolicy: policy } : prev));
+      Alert.alert('Policy Updated', `Media saving policy set to: ${policy === 'view_only' ? 'View Only' : policy === 'allow_save' ? 'Allow Saving' : 'Keep in Chat'}`);
+    }
+  };
+
   const handleLeaveRoom = () => {
-    Alert.alert('Leave Room', 'Are you sure you want to leave this room?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave',
-        style: 'destructive',
-        onPress: async () => {
-          const res = await api.post(`/rooms/${roomId}/leave`);
-          if (res.success) {
-            onClose();
-            onRoomDeletedOrLeft?.();
-          }
+    Alert.alert(
+      'Leave Private Room',
+      'Leaving this private room will permanently delete the entire conversation and its shared content for everyone. This action cannot be undone. Do you want to continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave and Delete for Everyone',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await api.post(`/rooms/${roomId}/leave`);
+            if (res.success) {
+              onClose();
+              onRoomDeletedOrLeft?.();
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleDeleteRoom = () => {
     Alert.alert(
       'Delete Room Forever',
-      'This will permanently delete this room and remove all members and messages.',
+      'Leaving this private room will permanently delete the entire conversation and its shared content for everyone. This action cannot be undone. Do you want to continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Permanently',
+          text: 'Leave and Delete for Everyone',
           style: 'destructive',
           onPress: async () => {
             const res = await api.delete(`/rooms/${roomId}`);
@@ -270,6 +298,148 @@ export const RoomDetailsModal: React.FC<RoomDetailsModalProps> = ({
                 </View>
               </View>
             )}
+
+            {/* Snapchat-Style Disappearing Messages Settings */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700' }]}>
+                  DISAPPEARING MESSAGES
+                </Text>
+                <Ionicons name="timer-outline" size={16} color={colors.primary} />
+              </View>
+
+              <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs }]}>
+                Messages and media disappear automatically based on this timer.
+              </Text>
+
+              <View style={styles.policyRow}>
+                {[
+                  { id: 'after_view' as DisappearingMode, label: 'After View', icon: 'flash' },
+                  { id: '24h' as DisappearingMode, label: '24 Hours', icon: 'hourglass' },
+                  { id: '7d' as DisappearingMode, label: '7 Days', icon: 'calendar' },
+                  { id: 'off' as DisappearingMode, label: 'Off', icon: 'close-circle' },
+                ].map((item) => {
+                  const active = (room?.disappearingMode || '24h') === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => handleSelectDisappearingMode(item.id)}
+                      style={[
+                        styles.policyPill,
+                        {
+                          backgroundColor: active ? colors.primary : colors.surfaceElevated,
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={item.icon as any}
+                        size={13}
+                        color={active ? '#FFFFFF' : colors.textSecondary}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text
+                        style={[
+                          styles.policyPillText,
+                          { color: active ? '#FFFFFF' : colors.text, fontWeight: active ? '700' : '500' },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Controlled Media Saving Policy Settings */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700' }]}>
+                  MEDIA SAVING PERMISSION
+                </Text>
+                <Ionicons name="download-outline" size={16} color={colors.primary} />
+              </View>
+
+              <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs }]}>
+                Control whether participants can save photos and videos to their device gallery.
+              </Text>
+
+              <View style={styles.policyColumn}>
+                {[
+                  {
+                    id: 'allow_save' as MediaSavePolicy,
+                    title: 'Allow Saving',
+                    subtitle: 'Users can save media; participants are notified in chat',
+                    icon: 'cloud-download-outline',
+                  },
+                  {
+                    id: 'view_only' as MediaSavePolicy,
+                    title: 'View Only',
+                    subtitle: 'Viewing inside app only; downloads and saving disabled',
+                    icon: 'eye-outline',
+                  },
+                  {
+                    id: 'keep_in_chat' as MediaSavePolicy,
+                    title: 'Keep in Chat',
+                    subtitle: 'Save inside conversation; erased when room is deleted',
+                    icon: 'chatbubble-ellipses-outline',
+                  },
+                ].map((item) => {
+                  const active = (room?.mediaSavePolicy || 'allow_save') === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => handleSelectMediaSavePolicy(item.id)}
+                      style={[
+                        styles.mediaPolicyCard,
+                        {
+                          backgroundColor: active ? 'rgba(99, 102, 241, 0.12)' : colors.surfaceElevated,
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={item.icon as any}
+                        size={20}
+                        color={active ? colors.primary : colors.textSecondary}
+                        style={{ marginRight: spacing.sm }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            typography.body2,
+                            { color: active ? colors.primary : colors.text, fontWeight: '700' },
+                          ]}
+                        >
+                          {item.title}
+                        </Text>
+                        <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                          {item.subtitle}
+                        </Text>
+                      </View>
+                      {active && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Snapchat-Style Privacy & Screenshot Awareness Notice */}
+            <View style={[styles.privacyNoticeCard, { backgroundColor: 'rgba(255, 46, 99, 0.08)', borderColor: 'rgba(255, 46, 99, 0.3)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <Ionicons name="shield-half-outline" size={18} color="#FF2E63" style={{ marginRight: 6 }} />
+                <Text style={[typography.caption, { color: '#FF2E63', fontWeight: '800' }]}>
+                  PRIVACY & AUTO-DELETE SYSTEM
+                </Text>
+              </View>
+              <Text style={[typography.caption, { color: colors.textSecondary, lineHeight: 17 }]}>
+                • <Text style={{ fontWeight: '700', color: colors.text }}>Leaving deletes everything:</Text> If any participant leaves this private room, the entire conversation, shared photos, videos, voice recordings, and files are permanently deleted for everyone on all devices.
+              </Text>
+              <Text style={[typography.caption, { color: colors.textSecondary, lineHeight: 17, marginTop: 4 }]}>
+                • <Text style={{ fontWeight: '700', color: colors.text }}>Screenshot monitoring:</Text> Screenshot events are monitored and alerted where supported. No software can prevent secondary cameras or external device capture. Only share sensitive content with people you trust.
+              </Text>
+            </View>
 
             {/* Members Section */}
             <View style={styles.section}>
@@ -475,6 +645,41 @@ const styles = StyleSheet.create({
   footerActions: {
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+  },
+  policyRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  policyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  policyPillText: {
+    fontSize: 12,
+  },
+  policyColumn: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  mediaPolicyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  privacyNoticeCard: {
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   destructiveBtn: {
     flexDirection: 'row',

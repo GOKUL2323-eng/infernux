@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { DisappearingMode, MediaSavePolicy } from '@infernux/shared';
 
 export interface IRoomDocument extends Document {
   name: string;
@@ -9,6 +10,11 @@ export interface IRoomDocument extends Document {
   memberCount: number;
   maxMembers: number;
   requiresApproval: boolean;
+  disappearingMode: DisappearingMode;
+  mediaSavePolicy: MediaSavePolicy;
+  isDeleting: boolean;
+  deletedBy?: mongoose.Types.ObjectId;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +57,28 @@ const RoomSchema = new Schema<IRoomDocument>(
     requiresApproval: {
       type: Boolean,
       default: false,
+    },
+    disappearingMode: {
+      type: String,
+      enum: ['off', 'after_view', '24h', '7d'],
+      default: '24h',
+    },
+    mediaSavePolicy: {
+      type: String,
+      enum: ['view_only', 'allow_save', 'view_once', 'keep_in_chat'],
+      default: 'allow_save',
+    },
+    isDeleting: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    deletedAt: {
+      type: Date,
     },
   },
   {

@@ -77,8 +77,18 @@ export class RoomController {
   async leaveRoom(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = getParam(req.params.id);
-      await roomService.leaveRoom(id, req.userId!);
-      sendSuccess(res, null, 'Left room successfully');
+      const result = await roomService.leaveRoom(id, req.userId!);
+      sendSuccess(res, result, result.wasDestroyed ? 'Private room deleted for everyone' : 'Left room successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateRoomPrivacySettings(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const updated = await roomService.updateRoomPrivacySettings(id, req.userId!, req.body);
+      sendSuccess(res, updated, 'Room privacy settings updated');
     } catch (error) {
       next(error);
     }

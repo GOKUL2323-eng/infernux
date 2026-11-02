@@ -7,6 +7,7 @@ import {
   joinRoomByKeySchema,
   rotateRoomKeySchema,
   updateMemberRoleSchema,
+  updateRoomPrivacySettingsSchema,
 } from '@infernux/shared';
 
 const router = Router();
@@ -29,6 +30,9 @@ router.patch('/:id/members/:userId', validateBody(updateMemberRoleSchema), (req,
 );
 router.delete('/:id/members/:userId', (req, res, next) =>
   roomController.removeMember(req, res, next)
+);
+router.patch('/:id/privacy', validateBody(updateRoomPrivacySettingsSchema), (req, res, next) =>
+  roomController.updateRoomPrivacySettings(req, res, next)
 );
 router.post('/:id/leave', (req, res, next) => roomController.leaveRoom(req, res, next));
 router.delete('/:id', (req, res, next) => roomController.deleteRoom(req, res, next));

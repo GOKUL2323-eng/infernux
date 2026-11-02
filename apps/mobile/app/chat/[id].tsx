@@ -31,6 +31,7 @@ import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
 import { VoiceMessageBubble } from '../../src/components/VoiceMessageBubble';
 import { RoomDetailsModal } from '../../src/components/RoomDetailsModal';
+import { PrivateMediaViewerModal } from '../../src/components/chat/PrivateMediaViewerModal';
 import {
   AnimatedMessageBubble,
   hasMessageAnimated,
@@ -63,6 +64,13 @@ export default function ChatScreen() {
     addReaction,
     setActiveConversation,
     typingUsers,
+    destroyedRoomAlert,
+    clearDestroyedRoomAlert,
+    screenshotAlert,
+    clearScreenshotAlert,
+    consumeViewOnce,
+    saveMedia,
+    reportScreenshot,
   } = useChatStore();
   const { initiateCall } = useCallStore();
 
@@ -77,6 +85,8 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<MessageSummary | null>(null);
   const [replyingTo, setReplyingTo] = useState<MessageSummary | null>(null);
   const [isRoomDetailsVisible, setIsRoomDetailsVisible] = useState(false);
+  const [isViewOnceMode, setIsViewOnceMode] = useState(false);
+  const [viewingMediaMessage, setViewingMediaMessage] = useState<MessageSummary | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const conversationId = id as string;
@@ -96,6 +106,46 @@ export default function ChatScreen() {
     };
   }, [conversationId]);
 
+  // Handle real-time room destruction when a participant leaves
+  useEffect(() => {
+    if (
+      destroyedRoomAlert &&
+      (destroyedRoomAlert.conversationId === conversationId ||
+        destroyedRoomAlert.roomId === currentConversation?.roomId)
+    ) {
+      Alert.alert(
+        'Private Room Destroyed',
+        destroyedRoomAlert.message ||
+          'A participant left the private room. The entire chat and all shared content have been permanently deleted for everyone.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              clearDestroyedRoomAlert();
+              router.replace('/(tabs)/chats' as any);
+            },
+          },
+        ]
+      );
+    }
+  }, [destroyedRoomAlert, conversationId, currentConversation?.roomId]);
+
+  // Web screenshot awareness listener (PrintScreen)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen') {
+        reportScreenshot(conversationId, currentConversation?.roomId);
+      }
+    };
+
+    window.addEventListener('keyup', handleKey);
+    return () => {
+      window.removeEventListener('keyup', handleKey);
+    };
+  }, [conversationId, currentConversation?.roomId]);
+
   const handleSendText = async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
@@ -109,32 +159,41 @@ export default function ChatScreen() {
     await sendMessage(conversationId, `${prefix}${text}`, 'text');
   };
 
-  const handlePickImage = async () => {
+  const handlePickMedia = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
         quality: 0.8,
+        videoMaxDuration: 60,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        const isVid = asset.type === 'video';
         setIsUploading(true);
         const uploadedUrl = await uploadMediaAsset({
           uri: asset.uri,
-          type: 'image',
+          type: isVid ? 'video' : 'image',
           mimeType: asset.mimeType,
           fileName: asset.fileName,
         });
         setIsUploading(false);
 
-        await sendMessage(conversationId, 'Shared an image', 'image', [
-          { url: uploadedUrl, type: 'image' },
-        ]);
+        await sendMessage(
+          conversationId,
+          isViewOnceMode
+            ? `Shared a view-once ${isVid ? 'video' : 'photo'}`
+            : `Shared a ${isVid ? 'video' : 'photo'}`,
+          isVid ? 'video' : 'image',
+          [{ url: uploadedUrl, type: isVid ? 'video' : 'image' }],
+          isViewOnceMode
+        );
+        if (isViewOnceMode) setIsViewOnceMode(false);
       }
     } catch {
       setIsUploading(false);
-      Alert.alert('Error', 'Failed to attach image');
+      Alert.alert('Error', 'Failed to attach media');
     }
   };
 
@@ -366,6 +425,39 @@ export default function ChatScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
+            ) : item.viewOnce ? (
+              /* Snapchat-Style View Once Message Bubble */
+              item.isExpired || item.content === 'Opened' ? (
+                <View style={styles.viewOnceExpiredPill}>
+                  <Ionicons
+                    name="square-outline"
+                    size={16}
+                    color={isSender ? 'rgba(255,255,255,0.7)' : colors.textMuted}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={[styles.viewOnceExpiredText, { color: isSender ? 'rgba(255,255,255,0.7)' : colors.textMuted }]}>
+                    Opened
+                  </Text>
+                </View>
+              ) : isSender ? (
+                <View style={styles.viewOnceSenderPill}>
+                  <Ionicons name="flash" size={16} color="#FF2E63" style={{ marginRight: 6 }} />
+                  <Text style={styles.viewOnceSenderText}>
+                    View Once Media (Delivered)
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setViewingMediaMessage(item)}
+                  style={styles.viewOnceReceiverPill}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="flash" size={17} color="#FF2E63" style={{ marginRight: 6 }} />
+                  <Text style={styles.viewOnceReceiverText}>
+                    {item.contentType === 'video' ? 'Video • Tap to view' : 'Photo • Tap to view'}
+                  </Text>
+                </TouchableOpacity>
+              )
             ) : item.contentType === 'audio' && item.attachments && item.attachments[0] ? (
               /* 2. Audio Voice Note Message */
               <VoiceMessageBubble
@@ -375,13 +467,13 @@ export default function ChatScreen() {
               />
             ) : item.contentType === 'image' && item.attachments && item.attachments[0] ? (
               /* 3. Image Attachment Message */
-              <View>
+              <TouchableOpacity activeOpacity={0.9} onPress={() => setViewingMediaMessage(item)}>
                 <Image
                   source={{ uri: sanitizeMediaUrl(item.attachments[0].url) }}
                   style={styles.attachmentImage}
                   resizeMode="cover"
                 />
-                {item.content && item.content !== 'Shared an image' ? (
+                {item.content && item.content !== 'Shared an image' && item.content !== 'Shared a photo' ? (
                   <Text
                     style={[
                       styles.imageCaptionText,
@@ -391,9 +483,21 @@ export default function ChatScreen() {
                     {item.content}
                   </Text>
                 ) : null}
-              </View>
+              </TouchableOpacity>
+            ) : item.contentType === 'video' && item.attachments && item.attachments[0] ? (
+              /* 4. Video Attachment Message */
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setViewingMediaMessage(item)}
+                style={styles.videoAttachmentCard}
+              >
+                <View style={styles.videoAttachmentOverlay}>
+                  <Ionicons name="play-circle" size={44} color="#FFFFFF" />
+                  <Text style={styles.videoAttachmentLabel}>Video Attachment</Text>
+                </View>
+              </TouchableOpacity>
             ) : (
-              /* 4. Standard Text Message */
+              /* 5. Standard Text Message */
               <Text
                 style={[
                   styles.messageText,
@@ -413,8 +517,24 @@ export default function ChatScreen() {
               />
             )}
 
-            {/* Message Footer: Timestamp & Read Receipts */}
+            {/* Message Footer: Timestamp, Disappearing Timer, Saved Indicator & Read Receipts */}
             <View style={styles.msgFooter}>
+              {item.disappearingMode && item.disappearingMode !== 'off' && (
+                <Ionicons
+                  name="hourglass-outline"
+                  size={11}
+                  color={isSender ? 'rgba(255,255,255,0.7)' : colors.textMuted}
+                  style={{ marginRight: 3 }}
+                />
+              )}
+              {item.savedBy && item.savedBy.length > 0 && (
+                <Ionicons
+                  name="bookmark"
+                  size={11}
+                  color="#6366F1"
+                  style={{ marginRight: 3 }}
+                />
+              )}
               <Text
                 style={[
                   styles.timeText,
@@ -488,7 +608,7 @@ export default function ChatScreen() {
               ]}
             >
               {isRoom
-                ? 'Protected Room • Info'
+                ? '🔒 Private Room • Auto-Delete'
                 : otherParticipant?.isOnline
                 ? 'Active now'
                 : 'Offline'}
@@ -525,6 +645,25 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Real-Time Screenshot Awareness Banner */}
+      {screenshotAlert &&
+        (screenshotAlert.conversationId === conversationId ||
+          screenshotAlert.roomId === currentConversation?.roomId) && (
+          <View style={styles.screenshotAlertBanner}>
+            <Ionicons name="camera" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.screenshotAlertText}>
+              📸 @{screenshotAlert.username} took a screenshot!
+            </Text>
+            <TouchableOpacity
+              onPress={clearScreenshotAlert}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginLeft: 12 }}
+            >
+              <Ionicons name="close" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
 
       {/* 2. Messages Feed & Composer inside KeyboardAvoidingView */}
       <KeyboardAvoidingView
@@ -582,12 +721,43 @@ export default function ChatScreen() {
           {/* Camera / Image Attachment Button */}
           {!isRecording && (
             <TouchableOpacity
-              onPress={handlePickImage}
+              onPress={handlePickMedia}
               disabled={isUploading}
               style={styles.composerActionBtn}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
               <Ionicons name="camera-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+
+          {/* View Once Toggle Button for Private Rooms */}
+          {!isRecording && isRoom && (
+            <TouchableOpacity
+              onPress={() => setIsViewOnceMode(!isViewOnceMode)}
+              style={[
+                styles.viewOnceToggleBtn,
+                isViewOnceMode && styles.viewOnceToggleBtnActive,
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <View
+                style={[
+                  styles.viewOnceBadgeCircle,
+                  {
+                    borderColor: isViewOnceMode ? '#FF2E63' : colors.textMuted,
+                    backgroundColor: isViewOnceMode ? '#FF2E63' : 'transparent',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.viewOnceBadgeText,
+                    { color: isViewOnceMode ? '#FFFFFF' : colors.textMuted },
+                  ]}
+                >
+                  1
+                </Text>
+              </View>
             </TouchableOpacity>
           )}
 
@@ -719,6 +889,25 @@ export default function ChatScreen() {
           onClose={() => setIsRoomDetailsVisible(false)}
           onRoomDeletedOrLeft={() => {
             router.replace('/(tabs)/chats' as any);
+          }}
+        />
+      )}
+
+      {/* 6. Snapchat-Style Private Media Viewer Modal */}
+      {viewingMediaMessage && (
+        <PrivateMediaViewerModal
+          visible={Boolean(viewingMediaMessage)}
+          message={viewingMediaMessage}
+          conversationId={conversationId}
+          onClose={() => setViewingMediaMessage(null)}
+          onConsumeViewOnce={async (msgId) => {
+            await consumeViewOnce(msgId, conversationId);
+          }}
+          onSaveMedia={async (msgId, mediaUrl) => {
+            return await saveMedia(msgId, conversationId, mediaUrl);
+          }}
+          onScreenshotDetected={() => {
+            reportScreenshot(conversationId, currentConversation?.roomId);
           }}
         />
       )}
@@ -1038,5 +1227,94 @@ const styles = StyleSheet.create({
   recordingWaveBar: {
     width: 3,
     borderRadius: 1.5,
+  },
+  screenshotAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF2E63',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    zIndex: 100,
+  },
+  screenshotAlertText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12.5,
+  },
+  viewOnceToggleBtn: {
+    padding: 6,
+    marginRight: 2,
+  },
+  viewOnceToggleBtnActive: {
+    transform: [{ scale: 1.05 }],
+  },
+  viewOnceBadgeCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewOnceBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  viewOnceExpiredPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  viewOnceExpiredText: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  viewOnceSenderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  viewOnceSenderText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  viewOnceReceiverPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 46, 99, 0.12)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 46, 99, 0.4)',
+  },
+  viewOnceReceiverText: {
+    color: '#FF2E63',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  videoAttachmentCard: {
+    width: 220,
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  videoAttachmentOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoAttachmentLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
   },
 });

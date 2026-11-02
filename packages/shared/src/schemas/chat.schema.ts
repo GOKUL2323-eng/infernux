@@ -29,7 +29,17 @@ export const sendMessageSchema = z.object({
   attachments: z.array(mediaAttachmentSchema).optional(),
   replyToId: z.string().optional(),
   clientTempId: z.string().optional(),
+  viewOnce: z.boolean().optional(),
+  disappearingMode: z.enum(['off', 'after_view', '24h', '7d']).optional(),
   metadata: z.record(z.any()).optional(),
+});
+
+export const saveMediaSchema = z.object({
+  mediaUrl: z.string().url(),
+});
+
+export const consumeViewOnceSchema = z.object({
+  messageId: z.string().min(1),
 });
 
 export const editMessageSchema = z.object({
@@ -52,4 +62,6 @@ export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type EditMessageInput = z.infer<typeof editMessageSchema>;
 export type AddReactionInput = z.infer<typeof addReactionSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+export type SaveMediaInput = z.infer<typeof saveMediaSchema>;
+export type ConsumeViewOnceInput = z.infer<typeof consumeViewOnceSchema>;
 

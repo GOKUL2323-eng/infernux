@@ -14,7 +14,14 @@ interface AuthenticatedSocket extends Socket {
   username?: string;
 }
 
+let ioInstance: SocketIOServer | null = null;
+
+export function getIO(): SocketIOServer | null {
+  return ioInstance;
+}
+
 export function initializeSocketIO(io: SocketIOServer): void {
+  ioInstance = io;
   // Authentication middleware for socket connections
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
@@ -162,6 +169,30 @@ export function initializeSocketIO(io: SocketIOServer): void {
 
     socket.on(SOCKET_EVENTS.CALL_ENDED, (data: { targetUserId: string; callId: string }) => {
       io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.CALL_ENDED, data);
+    });
+
+    // --- SCREENSHOT & PRIVACY AWARENESS ---
+    socket.on(SOCKET_EVENTS.SCREENSHOT_DETECTED, async (data: { conversationId?: string; roomId?: string }) => {
+      try {
+        const userDoc = await User.findById(userId).select('username displayName');
+        const alertPayload = {
+          conversationId: data.conversationId,
+          roomId: data.roomId,
+          userId,
+          username: userDoc?.username || socket.username || 'User',
+          displayName: userDoc?.displayName || 'User',
+          timestamp: new Date().toISOString(),
+        };
+
+        if (data.conversationId) {
+          io.to(`conversation:${data.conversationId}`).emit(SOCKET_EVENTS.SCREENSHOT_DETECTED, alertPayload);
+        }
+        if (data.roomId) {
+          io.to(`room:${data.roomId}`).emit(SOCKET_EVENTS.SCREENSHOT_DETECTED, alertPayload);
+        }
+      } catch (err) {
+        logger.error('Error handling screenshot detection event', 'SocketIO', err);
+      }
     });
 
     // --- HEARTBEAT & DISCONNECT ---

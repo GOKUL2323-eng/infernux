@@ -17,10 +17,19 @@ interface ChatState {
   activeConversationId: string | null;
   typingUsers: Record<string, string[]>;
   isLoading: boolean;
+  screenshotAlert: { conversationId?: string; roomId?: string; username: string; displayName: string; timestamp: number } | null;
+  destroyedRoomAlert: { roomId: string; conversationId?: string; message: string; leaverName: string } | null;
 
   loadConversations: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
-  sendMessage: (conversationId: string, content: string, contentType?: any, attachments?: any[]) => Promise<void>;
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    contentType?: any,
+    attachments?: any[],
+    viewOnce?: boolean,
+    disappearingMode?: any
+  ) => Promise<void>;
   receiveMessage: (message: MessageSummary) => void;
   setActiveConversation: (id: string | null) => void;
   setUserTyping: (conversationId: string, username: string, isTyping: boolean) => void;
@@ -29,6 +38,12 @@ interface ChatState {
   deleteMessage: (messageId: string, conversationId: string) => Promise<boolean>;
   addReaction: (messageId: string, conversationId: string, emoji: string) => Promise<boolean>;
   editMessage: (messageId: string, conversationId: string, content: string) => Promise<boolean>;
+  consumeViewOnce: (messageId: string, conversationId: string) => Promise<boolean>;
+  saveMedia: (messageId: string, conversationId: string, mediaUrl: string) => Promise<boolean>;
+  reportScreenshot: (conversationId?: string, roomId?: string) => void;
+  clearScreenshotAlert: () => void;
+  clearDestroyedRoomAlert: () => void;
+  initSocketListeners: () => void;
   reset: () => void;
 }
 
@@ -38,6 +53,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeConversationId: null,
   typingUsers: {},
   isLoading: false,
+  screenshotAlert: null,
+  destroyedRoomAlert: null,
 
   reset: () => {
     set({
@@ -46,8 +63,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeConversationId: null,
       typingUsers: {},
       isLoading: false,
+      screenshotAlert: null,
+      destroyedRoomAlert: null,
     });
   },
+
+  clearScreenshotAlert: () => set({ screenshotAlert: null }),
+  clearDestroyedRoomAlert: () => set({ destroyedRoomAlert: null }),
 
   loadConversations: async () => {
     set({ isLoading: true });
@@ -75,7 +97,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (conversationId: string, content: string, contentType = 'text', attachments = []) => {
+  sendMessage: async (
+    conversationId: string,
+    content: string,
+    contentType = 'text',
+    attachments = [],
+    viewOnce = false,
+    disappearingMode?: any
+  ) => {
     const tempId = `temp_${Date.now()}`;
     const payload: SendMessageInput = {
       conversationId,
@@ -83,6 +112,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       contentType,
       attachments,
       clientTempId: tempId,
+      viewOnce,
+      disappearingMode,
     };
 
     const res = await api.post<MessageSummary>(`/chats/conversations/${conversationId}/messages`, payload);
@@ -220,6 +251,152 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return true;
     }
     return false;
+  },
+
+  consumeViewOnce: async (messageId: string, conversationId: string) => {
+    // Immediately update local message to Opened/Expired
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [conversationId]: (state.messages[conversationId] || []).map((m) =>
+          m.id === messageId
+            ? { ...m, isExpired: true, content: 'Opened', attachments: [] }
+            : m
+        ),
+      },
+    }));
+
+    const res = await api.post(`/chats/messages/${messageId}/consume-view-once`);
+    return res.success;
+  },
+
+  saveMedia: async (messageId: string, conversationId: string, mediaUrl: string) => {
+    const res = await api.post(`/chats/messages/${messageId}/save-media`, { mediaUrl });
+    if (res.success) {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [conversationId]: (state.messages[conversationId] || []).map((m) => {
+            if (m.id === messageId) {
+              const currentSaved = m.savedBy || [];
+              return {
+                ...m,
+                savedBy: [...currentSaved, { userId: 'me', savedAt: new Date().toISOString() }],
+              };
+            }
+            return m;
+          }),
+        },
+      }));
+      return true;
+    }
+    return false;
+  },
+
+  reportScreenshot: (conversationId?: string, roomId?: string) => {
+    const socket = socketClient.getSocket();
+    if (socket) {
+      socket.emit(SOCKET_EVENTS.SCREENSHOT_DETECTED, { conversationId, roomId });
+    }
+  },
+
+  initSocketListeners: () => {
+    const socket = socketClient.getSocket();
+    if (!socket) return;
+
+    // Avoid multiple registrations
+    socket.off(SOCKET_EVENTS.NEW_MESSAGE);
+    socket.off(SOCKET_EVENTS.ROOM_DESTROYED);
+    socket.off(SOCKET_EVENTS.MESSAGE_CONSUMED);
+    socket.off(SOCKET_EVENTS.MESSAGE_EXPIRED);
+    socket.off(SOCKET_EVENTS.MEDIA_SAVED);
+    socket.off(SOCKET_EVENTS.SCREENSHOT_DETECTED);
+    socket.off(SOCKET_EVENTS.USER_TYPING);
+
+    // 1. Incoming real-time message
+    socket.on(SOCKET_EVENTS.NEW_MESSAGE, (message: MessageSummary) => {
+      get().receiveMessage(message);
+    });
+
+    // 2. Private room destruction event (triggered when any participant leaves)
+    socket.on(SOCKET_EVENTS.ROOM_DESTROYED, (data: { roomId: string; conversationId?: string; message: string; leaverName: string }) => {
+      set((state) => {
+        const remainingConvs = state.conversations.filter(
+          (c) => c.roomId !== data.roomId && (!data.conversationId || c.id !== data.conversationId)
+        );
+        const updatedMessages = { ...state.messages };
+        if (data.conversationId) {
+          delete updatedMessages[data.conversationId];
+        }
+
+        return {
+          conversations: remainingConvs,
+          messages: updatedMessages,
+          destroyedRoomAlert: data,
+        };
+      });
+    });
+
+    // 3. View-once consumed
+    socket.on(SOCKET_EVENTS.MESSAGE_CONSUMED, (data: { messageId: string; conversationId: string; viewedByUserId: string }) => {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [data.conversationId]: (state.messages[data.conversationId] || []).map((m) =>
+            m.id === data.messageId
+              ? { ...m, isExpired: true, content: 'Opened', attachments: [] }
+              : m
+          ),
+        },
+      }));
+    });
+
+    // 4. Message expired via background timer
+    socket.on(SOCKET_EVENTS.MESSAGE_EXPIRED, (data: { messageId: string; conversationId: string }) => {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [data.conversationId]: (state.messages[data.conversationId] || []).filter(
+            (m) => m.id !== data.messageId
+          ),
+        },
+      }));
+    });
+
+    // 5. Media saved alert
+    socket.on(SOCKET_EVENTS.MEDIA_SAVED, (data: { messageId: string; conversationId: string; username: string; displayName: string }) => {
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [data.conversationId]: (state.messages[data.conversationId] || []).map((m) =>
+            m.id === data.messageId
+              ? {
+                  ...m,
+                  savedBy: [
+                    ...(m.savedBy || []),
+                    { userId: 'other', username: data.username, savedAt: new Date().toISOString() },
+                  ],
+                }
+              : m
+          ),
+        },
+      }));
+    });
+
+    // 6. Screenshot awareness alert
+    socket.on(SOCKET_EVENTS.SCREENSHOT_DETECTED, (data: { conversationId?: string; roomId?: string; username: string; displayName: string }) => {
+      set({
+        screenshotAlert: {
+          ...data,
+          timestamp: Date.now(),
+        },
+      });
+    });
+
+    // 7. Typing status
+    socket.on(SOCKET_EVENTS.USER_TYPING, (data: { conversationId: string; username: string; isTyping: boolean }) => {
+      get().setUserTyping(data.conversationId, data.username, data.isTyping);
+    });
   },
 }));
 

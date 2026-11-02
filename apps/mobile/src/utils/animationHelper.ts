@@ -6,3 +6,4 @@ import { Platform } from 'react-native';
  * so we fall back to false cleanly on web while keeping 60FPS native drivers on mobile devices.
  */
 export const useNativeDriver = Platform.OS !== 'web';
+

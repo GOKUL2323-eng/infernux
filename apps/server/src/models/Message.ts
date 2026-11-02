@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { MessageContentType, MediaAttachment } from '@infernux/shared';
+import { MessageContentType, MediaAttachment, DisappearingMode, MediaSavePolicy } from '@infernux/shared';
 
 export interface IMessageDocument extends Document {
   conversationId: mongoose.Types.ObjectId;
@@ -26,6 +26,24 @@ export interface IMessageDocument extends Document {
   isEdited: boolean;
   isDeleted: boolean;
   isPinned: boolean;
+  expiresAt?: Date;
+  disappearingMode?: DisappearingMode;
+  viewOnce: boolean;
+  viewedAt?: Date;
+  viewedBy: Array<{
+    userId: mongoose.Types.ObjectId;
+    viewedAt: Date;
+  }>;
+  isExpired: boolean;
+  mediaSavePolicy?: MediaSavePolicy;
+  savedBy: Array<{
+    userId: mongoose.Types.ObjectId;
+    savedAt: Date;
+  }>;
+  screenshotAlerts: Array<{
+    userId: mongoose.Types.ObjectId;
+    detectedAt: Date;
+  }>;
   clientTempId?: string;
   metadata?: Record<string, any>;
   createdAt: Date;
@@ -104,6 +122,30 @@ const MessageSchema = new Schema<IMessageDocument>(
     isEdited: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
     isPinned: { type: Boolean, default: false },
+    expiresAt: { type: Date, index: true },
+    disappearingMode: { type: String, enum: ['off', 'after_view', '24h', '7d'] },
+    viewOnce: { type: Boolean, default: false },
+    viewedAt: { type: Date },
+    viewedBy: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        viewedAt: { type: Date, default: Date.now },
+      },
+    ],
+    isExpired: { type: Boolean, default: false, index: true },
+    mediaSavePolicy: { type: String, enum: ['view_only', 'allow_save', 'view_once', 'keep_in_chat'] },
+    savedBy: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        savedAt: { type: Date, default: Date.now },
+      },
+    ],
+    screenshotAlerts: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        detectedAt: { type: Date, default: Date.now },
+      },
+    ],
     clientTempId: { type: String, index: true },
     metadata: { type: Schema.Types.Mixed },
   },

@@ -30,6 +30,12 @@ class SocketClient {
 
     this.socket.on('connect', () => {
       console.log('[Socket] Connected to MOZHI Realtime Engine');
+      try {
+        const { useChatStore } = require('../store/useChatStore');
+        useChatStore.getState().initSocketListeners();
+      } catch {
+        // ignore circular require if initializing
+      }
     });
 
     this.socket.on('connect_error', (err) => {

@@ -87,6 +87,26 @@ export class ChatController {
       next(error);
     }
   }
+
+  async consumeViewOnce(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const messageId = getParam(req.params.messageId);
+      await chatService.consumeViewOnce(messageId, req.userId!);
+      sendSuccess(res, null, 'View-once media consumed and purged');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async saveMedia(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const messageId = getParam(req.params.messageId);
+      await chatService.recordMediaSaved(messageId, req.userId!, req.body.mediaUrl);
+      sendSuccess(res, null, 'Media saved recorded');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const chatController = new ChatController();

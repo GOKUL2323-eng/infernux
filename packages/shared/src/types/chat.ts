@@ -25,6 +25,10 @@ export interface RoomKeyInfo {
   createdAt: string;
 }
 
+export type DisappearingMode = 'off' | 'after_view' | '24h' | '7d';
+
+export type MediaSavePolicy = 'view_only' | 'allow_save' | 'view_once' | 'keep_in_chat';
+
 export interface RoomDetails {
   id: string;
   name: string;
@@ -35,6 +39,9 @@ export interface RoomDetails {
   memberCount: number;
   members?: RoomMember[];
   currentKey?: RoomKeyInfo;
+  disappearingMode?: DisappearingMode;
+  mediaSavePolicy?: MediaSavePolicy;
+  isDeleting?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -107,6 +114,14 @@ export interface MessageSummary {
   isEdited: boolean;
   isDeleted: boolean;
   isPinned: boolean;
+  expiresAt?: string;
+  disappearingMode?: DisappearingMode;
+  viewOnce?: boolean;
+  viewedAt?: string;
+  isExpired?: boolean;
+  mediaSavePolicy?: MediaSavePolicy;
+  savedBy?: Array<{ userId: string; savedAt: string; username?: string }>;
+  screenshotAlerts?: Array<{ userId: string; detectedAt: string; username?: string }>;
   createdAt: string;
   updatedAt: string;
   metadata?: Record<string, any>;

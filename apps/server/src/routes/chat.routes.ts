@@ -30,6 +30,12 @@ router.delete('/messages/:id', (req, res, next) => chatController.deleteMessage(
 router.post('/messages/:id/reactions', validateBody(addReactionSchema), (req, res, next) =>
   chatController.addReaction(req, res, next)
 );
+router.post('/messages/:messageId/consume-view-once', (req, res, next) =>
+  chatController.consumeViewOnce(req, res, next)
+);
+router.post('/messages/:messageId/save-media', (req, res, next) =>
+  chatController.saveMedia(req, res, next)
+);
 router.post('/conversations/:id/read', (req, res, next) =>
   chatController.markAsRead(req, res, next)
 );

@@ -20,6 +20,9 @@ export const SOCKET_EVENTS = {
   MESSAGE_SENT: 'chat:message_sent',
   MESSAGE_EDITED: 'chat:message_edited',
   MESSAGE_DELETED: 'chat:message_deleted',
+  MESSAGE_EXPIRED: 'chat:message_expired',
+  MESSAGE_CONSUMED: 'chat:message_consumed',
+  MEDIA_SAVED: 'chat:media_saved',
   MESSAGE_REACTION: 'chat:reaction',
   TYPING_START: 'chat:typing_start',
   TYPING_STOP: 'chat:typing_stop',
@@ -33,6 +36,9 @@ export const SOCKET_EVENTS = {
   ROOM_LEFT: 'room:left',
   ROOM_KEY_ROTATED: 'room:key_rotated',
   ROOM_MEMBER_UPDATED: 'room:member_updated',
+  ROOM_DESTROYED: 'room:destroyed',
+  ROOM_SETTINGS_UPDATED: 'room:settings_updated',
+  SCREENSHOT_DETECTED: 'room:screenshot_detected',
 
   // Voice & Video Calling
   CALL_INITIATE: 'call:initiate',

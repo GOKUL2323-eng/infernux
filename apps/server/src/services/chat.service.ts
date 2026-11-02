@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 import { Conversation, IConversationDocument } from '../models/Conversation';
 import { Message, IMessageDocument } from '../models/Message';
 import { User } from '../models/User';
+import { Room } from '../models/Room';
+import { deleteMediaAttachments } from '../utils/fileDeletion';
+import { getIO } from '../sockets';
+import { logger } from '../utils/logger';
 import {
   SendMessageInput,
   EditMessageInput,
@@ -10,6 +14,9 @@ import {
   ConversationSummary,
   MessageSummary,
   PaginatedResponse,
+  SOCKET_EVENTS,
+  DisappearingMode,
+  MediaSavePolicy,
 } from '@infernux/shared';
 
 export class ChatService {
@@ -101,7 +108,15 @@ export class ChatService {
       throw new Error('Access denied: You are not a participant in this conversation');
     }
 
-    const query: any = { conversationId };
+    const query: any = {
+      conversationId,
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } },
+        { viewOnce: true },
+      ],
+    };
     if (beforeCursor) {
       const cursorMessage = await Message.findById(beforeCursor);
       if (cursorMessage) {
@@ -112,6 +127,7 @@ export class ChatService {
     const messages = await Message.find(query)
       .populate('senderId', 'username displayName avatarUrl isVerified')
       .populate('reactions.userId', 'username displayName avatarUrl')
+      .populate('savedBy.userId', 'username displayName')
       .sort({ createdAt: -1 })
       .limit(limit + 1);
 
@@ -121,6 +137,10 @@ export class ChatService {
 
     const formattedItems: MessageSummary[] = items.map((m) => {
       const sender = m.senderId as any;
+      const isViewerRecipient = sender?._id?.toString() !== userId;
+      const hasViewed = m.viewedBy && m.viewedBy.some((v: any) => v.userId?.toString() === userId);
+      const isViewOnceExpiredForUser = m.viewOnce && (m.isExpired || (isViewerRecipient && hasViewed));
+
       return {
         id: m._id.toString(),
         conversationId: m.conversationId.toString(),
@@ -133,8 +153,12 @@ export class ChatService {
           isVerified: sender?.isVerified,
         },
         contentType: m.contentType,
-        content: m.isDeleted ? 'This message was deleted' : m.content,
-        attachments: m.isDeleted ? [] : m.attachments,
+        content: m.isDeleted
+          ? 'This message was deleted'
+          : isViewOnceExpiredForUser
+          ? 'Opened'
+          : m.content,
+        attachments: m.isDeleted || isViewOnceExpiredForUser ? [] : m.attachments,
         replyTo:
           m.replyTo && m.replyTo.id
             ? {
@@ -157,6 +181,17 @@ export class ChatService {
         isEdited: m.isEdited,
         isDeleted: m.isDeleted,
         isPinned: m.isPinned,
+        expiresAt: m.expiresAt?.toISOString(),
+        disappearingMode: m.disappearingMode,
+        viewOnce: m.viewOnce,
+        viewedAt: m.viewedAt?.toISOString(),
+        isExpired: m.isExpired,
+        mediaSavePolicy: m.mediaSavePolicy,
+        savedBy: (m.savedBy || []).map((s: any) => ({
+          userId: s.userId?._id?.toString() || s.userId?.toString(),
+          username: s.userId?.username,
+          savedAt: s.savedAt?.toISOString() || new Date().toISOString(),
+        })),
         metadata: m.metadata,
         createdAt: m.createdAt.toISOString(),
         updatedAt: m.updatedAt.toISOString(),
@@ -185,6 +220,33 @@ export class ChatService {
       throw new Error('Access denied: You are not a member of this conversation');
     }
 
+    let disappearingMode: DisappearingMode | undefined;
+    let mediaSavePolicy: MediaSavePolicy | undefined;
+    const isViewOnce = Boolean(input.viewOnce);
+    let expiresAt: Date | undefined;
+
+    // Check if this conversation is linked to a private room
+    if (conv.type === 'room' && conv.roomId) {
+      const room = await Room.findById(conv.roomId);
+      if (!room) {
+        throw new Error('Associated room not found or deleted');
+      }
+      if (room.isDeleting) {
+        throw new Error('Cannot send messages: This private room is being permanently deleted');
+      }
+
+      mediaSavePolicy = room.mediaSavePolicy;
+      disappearingMode = (input.disappearingMode || room.disappearingMode || '24h') as DisappearingMode;
+
+      if (isViewOnce) {
+        disappearingMode = 'after_view';
+      } else if (disappearingMode === '24h') {
+        expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
+      } else if (disappearingMode === '7d') {
+        expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+      }
+    }
+
     let replyToObj;
     if (input.replyToId) {
       const parentMsg = await Message.findById(input.replyToId).populate('senderId', 'displayName');
@@ -208,6 +270,11 @@ export class ChatService {
       clientTempId: input.clientTempId,
       metadata: input.metadata,
       receipts: [{ userId: senderId, status: 'sent', updatedAt: new Date() }],
+      viewOnce: isViewOnce,
+      disappearingMode,
+      mediaSavePolicy,
+      expiresAt,
+      isExpired: false,
     });
     await message.save();
 
@@ -215,7 +282,11 @@ export class ChatService {
     conv.lastMessage = {
       id: message._id,
       senderId: new mongoose.Types.ObjectId(senderId),
-      content: input.contentType === 'text' ? input.content : `[${input.contentType}]`,
+      content: isViewOnce
+        ? '[View Once Media]'
+        : input.contentType === 'text'
+        ? input.content
+        : `[${input.contentType}]`,
       contentType: input.contentType,
       createdAt: message.createdAt,
     };
@@ -251,6 +322,11 @@ export class ChatService {
       isEdited: false,
       isDeleted: false,
       isPinned: false,
+      expiresAt: message.expiresAt?.toISOString(),
+      disappearingMode: message.disappearingMode,
+      viewOnce: message.viewOnce,
+      isExpired: message.isExpired,
+      mediaSavePolicy: message.mediaSavePolicy,
       createdAt: message.createdAt.toISOString(),
       updatedAt: message.updatedAt.toISOString(),
       metadata: message.metadata,
@@ -374,6 +450,162 @@ export class ChatService {
       await conv.save();
       return conv._id.toString();
     }
+  }
+
+  /**
+   * Consumes a Snapchat-style view-once media message:
+   * Immediately deletes the media attachments from server disk & Cloudinary,
+   * updates the message status to opened/expired, and notifies all participants.
+   */
+  async consumeViewOnce(messageId: string, userId: string): Promise<void> {
+    const msg = await Message.findById(messageId);
+    if (!msg) throw new Error('Message not found');
+
+    const conv = await Conversation.findOne({ _id: msg.conversationId, participants: userId });
+    if (!conv) {
+      throw new Error('Access denied: You are not a member of this conversation');
+    }
+
+    if (!msg.viewOnce) {
+      throw new Error('This message is not configured as view-once');
+    }
+
+    if (msg.isExpired) {
+      return; // Already consumed
+    }
+
+    // 1. Immediately delete media attachments from server disk and Cloudinary
+    if (msg.attachments && msg.attachments.length > 0) {
+      try {
+        await deleteMediaAttachments(msg.attachments);
+      } catch (err) {
+        logger.error('Error deleting view-once media attachments', 'ChatService', err);
+      }
+    }
+
+    // 2. Mark consumed and wipe media URLs so they cannot be retrieved again
+    msg.isExpired = true;
+    msg.viewedAt = new Date();
+    msg.attachments = [];
+    msg.content = 'Opened';
+    if (!msg.viewedBy) msg.viewedBy = [];
+    msg.viewedBy.push({ userId: new mongoose.Types.ObjectId(userId), viewedAt: new Date() });
+    await msg.save();
+
+    // 3. Notify all conversation participants via Socket.IO
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_CONSUMED, {
+        messageId: msg._id.toString(),
+        conversationId: msg.conversationId.toString(),
+        viewedByUserId: userId,
+        viewedAt: msg.viewedAt.toISOString(),
+      });
+    }
+
+    logger.info(`View-once message ${messageId} consumed and media purged by user ${userId}`, 'ChatService');
+  }
+
+  /**
+   * Records that a user explicitly saved a media attachment (when room policy allows it).
+   * Notifies all room participants with real-time alert and system message.
+   */
+  async recordMediaSaved(messageId: string, userId: string, mediaUrl: string): Promise<void> {
+    const msg = await Message.findById(messageId);
+    if (!msg) throw new Error('Message not found');
+
+    const conv = await Conversation.findOne({ _id: msg.conversationId, participants: userId });
+    if (!conv) {
+      throw new Error('Access denied: You are not a member of this conversation');
+    }
+
+    // Verify room policy
+    if (conv.roomId) {
+      const room = await Room.findById(conv.roomId);
+      if (room && (room.mediaSavePolicy === 'view_only' || room.mediaSavePolicy === 'view_once')) {
+        throw new Error('Media saving is disabled by the private room policy');
+      }
+    }
+
+    if (msg.viewOnce) {
+      throw new Error('View-once media cannot be saved to device');
+    }
+
+    // Record save entry if not already saved by this user
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const alreadySaved = msg.savedBy && msg.savedBy.some((s) => s.userId.toString() === userId);
+    if (!alreadySaved) {
+      if (!msg.savedBy) msg.savedBy = [];
+      msg.savedBy.push({ userId: userObjectId, savedAt: new Date() });
+      await msg.save();
+    }
+
+    const saver = await User.findById(userId).select('username displayName');
+    const saverName = saver?.displayName || saver?.username || 'User';
+
+    // Broadcast real-time notification to all participants
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MEDIA_SAVED, {
+        messageId: msg._id.toString(),
+        conversationId: msg.conversationId.toString(),
+        userId,
+        username: saver?.username,
+        displayName: saverName,
+        savedAt: new Date().toISOString(),
+        message: `${saverName} saved a photo to camera roll`,
+      });
+    }
+
+    logger.info(`User ${userId} saved media in message ${messageId}`, 'ChatService');
+  }
+
+  /**
+   * Background cleanup routine for expired private room messages:
+   * Finds all messages with expiresAt in the past, securely unlinks storage files,
+   * marks them as expired/cleared, and emits real-time events.
+   */
+  async cleanupExpiredPrivateMessages(): Promise<number> {
+    const now = new Date();
+    const expiredMessages = await Message.find({
+      isExpired: { $ne: true },
+      isDeleted: false,
+      expiresAt: { $exists: true, $ne: null, $lte: now },
+    }).limit(100);
+
+    if (expiredMessages.length === 0) return 0;
+
+    let count = 0;
+    const io = getIO();
+
+    for (const msg of expiredMessages) {
+      try {
+        if (msg.attachments && msg.attachments.length > 0) {
+          await deleteMediaAttachments(msg.attachments);
+        }
+
+        msg.isExpired = true;
+        msg.attachments = [];
+        msg.content = 'This message has expired';
+        await msg.save();
+        count++;
+
+        if (io) {
+          io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_EXPIRED, {
+            messageId: msg._id.toString(),
+            conversationId: msg.conversationId.toString(),
+            expiredAt: now.toISOString(),
+          });
+        }
+      } catch (err) {
+        logger.error(`Error cleaning up expired message ${msg._id}`, 'ChatService', err);
+      }
+    }
+
+    if (count > 0) {
+      logger.info(`Cleaned up and purged ${count} expired private messages`, 'ChatService');
+    }
+    return count;
   }
 }
 
