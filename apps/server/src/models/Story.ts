@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { StoryMediaType, StoryAudience } from '@infernux/shared';
+import { StoryMediaType, StoryAudience, StorySticker } from '@infernux/shared';
 
 export interface IStoryDocument extends Document {
   creatorId: mongoose.Types.ObjectId;
@@ -8,6 +8,14 @@ export interface IStoryDocument extends Document {
   thumbnailUrl?: string;
   caption?: string;
   audience: StoryAudience;
+  allowedUserIds: mongoose.Types.ObjectId[];
+  collaboratorIds: mongoose.Types.ObjectId[];
+  stickers: StorySticker[];
+  reactions: Array<{
+    userId: mongoose.Types.ObjectId;
+    emoji: string;
+    createdAt: Date;
+  }>;
   duration: number;
   viewsCount: number;
   expiresAt: Date;
@@ -36,9 +44,19 @@ const StorySchema = new Schema<IStoryDocument>(
     caption: { type: String, maxlength: 200 },
     audience: {
       type: String,
-      enum: ['all', 'followers', 'close_friends'],
+      enum: ['all', 'followers', 'close_friends', 'custom'],
       default: 'all',
     },
+    allowedUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    collaboratorIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    stickers: { type: Schema.Types.Mixed, default: [] },
+    reactions: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        emoji: { type: String },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     duration: { type: Number, default: 5 },
     viewsCount: { type: Number, default: 0 },
     expiresAt: {

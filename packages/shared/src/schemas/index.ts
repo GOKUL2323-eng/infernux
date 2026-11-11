@@ -6,7 +6,11 @@ export * from './call.schema';
 export * from './post.schema';
 export * from './reel.schema';
 export * from './story.schema';
+export * from './snap.schema';
 export * from './note.schema';
 export * from './music.schema';
 export * from './moderation.schema';
+export * from './community.schema';
+export * from './experience.schema';
+export * from './platform.schema';
 

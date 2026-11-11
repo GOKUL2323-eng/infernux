@@ -24,6 +24,13 @@ export const SOCKET_EVENTS = {
   MESSAGE_CONSUMED: 'chat:message_consumed',
   MEDIA_SAVED: 'chat:media_saved',
   MESSAGE_REACTION: 'chat:reaction',
+  MESSAGE_PINNED: 'chat:message_pinned',
+  MESSAGE_INTERACTIVE_UPDATED: 'chat:message_interactive_updated',
+  MESSAGE_SECRET_REACTION: 'chat:message_secret_reaction',
+  DRAFT_UPDATED: 'chat:draft_updated',
+  CONVERSATION_PREFS_UPDATED: 'chat:conversation_prefs_updated',
+  REMINDER_TRIGGERED: 'chat:reminder_triggered',
+  STREAK_UPDATED: 'chat:streak_updated',
   TYPING_START: 'chat:typing_start',
   TYPING_STOP: 'chat:typing_stop',
   USER_TYPING: 'chat:user_typing',
@@ -55,4 +62,17 @@ export const SOCKET_EVENTS = {
 
   // Notifications
   NOTIFICATION_NEW: 'notification:new',
+
+  // Communities & Live Audio Rooms
+  AUDIO_ROOM_JOIN: 'audio_room:join',
+  AUDIO_ROOM_LEAVE: 'audio_room:leave',
+  AUDIO_ROOM_STATE: 'audio_room:state',
+  AUDIO_ROOM_REACTION: 'audio_room:reaction',
+  COMMUNITY_POST_NEW: 'community:post_new',
+
+  // Together Mode & Capsules
+  CAPSULE_UNLOCKED: 'capsule:unlocked',
+  TOGETHER_JOIN: 'together:join',
+  TOGETHER_LEAVE: 'together:leave',
+  TOGETHER_STATE: 'together:state',
 } as const;

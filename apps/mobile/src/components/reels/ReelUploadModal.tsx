@@ -28,6 +28,9 @@ interface ReelUploadModalProps {
 }
 
 type ReelAudience = 'all' | 'followers' | 'close_friends';
+type StudioStatus = 'published' | 'draft' | 'scheduled';
+
+const SPEED_OPTIONS = [0.5, 1, 1.25, 1.5, 2];
 
 const POPULAR_HASHTAGS = [
   '#trending',
@@ -50,11 +53,24 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
   const { loadReels } = useFeedStore();
 
   const [selectedVideo, setSelectedVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [extraClips, setExtraClips] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [selectedCover, setSelectedCover] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [caption, setCaption] = useState('');
   const [audioTitle, setAudioTitle] = useState('Original Audio');
   const [audioArtist, setAudioArtist] = useState('');
   const [audience, setAudience] = useState<ReelAudience>('all');
+
+  // Reels Studio controls
+  const [trimStartSec, setTrimStartSec] = useState('0');
+  const [trimEndSec, setTrimEndSec] = useState('30');
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [overlayText, setOverlayText] = useState('');
+  const [musicVolume, setMusicVolume] = useState(0.8);
+  const [voiceoverVolume, setVoiceoverVolume] = useState(1);
+  const [voiceoverUrl, setVoiceoverUrl] = useState('');
+  const [publishMode, setPublishMode] = useState<StudioStatus>('published');
+  const [scheduleOffsetHours, setScheduleOffsetHours] = useState(2);
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -116,6 +132,21 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
     setCaption((prev) => (prev ? `${prev} ${tag}` : tag));
   };
 
+  const handleAddExtraClip = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets?.length) {
+        setExtraClips((prev) => [...prev, result.assets[0]].slice(0, 9));
+      }
+    } catch {
+      Alert.alert('Error', 'Could not add extra video clip');
+    }
+  };
+
   const handlePublish = async () => {
     if (!selectedVideo) {
       Alert.alert('Required', 'Please select or record a video first.');
@@ -126,14 +157,30 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
     setUploadProgress(20);
 
     try {
-      // Step 1: Upload Video
-      setUploadProgress(40);
+      // Step 1: Upload Primary Video & Extra Clips
+      setUploadProgress(35);
       const videoUrl = await uploadMediaAsset({
         uri: selectedVideo.uri,
         type: 'video',
         mimeType: selectedVideo.mimeType || 'video/mp4',
         fileName: selectedVideo.fileName || 'reel_video.mp4',
       });
+
+      const uploadedClips: Array<{ videoUrl: string; startSec: number; endSec: number; speed?: number }> = [];
+      for (const clip of extraClips) {
+        const clipUrl = await uploadMediaAsset({
+          uri: clip.uri,
+          type: 'video',
+          mimeType: clip.mimeType || 'video/mp4',
+          fileName: clip.fileName || 'reel_clip.mp4',
+        });
+        uploadedClips.push({
+          videoUrl: clipUrl,
+          startSec: 0,
+          endSec: Math.min(Math.round((clip.duration || 10000) / 1000), 60) || 10,
+          speed: playbackSpeed,
+        });
+      }
 
       // Step 2: Upload or default Cover Image
       setUploadProgress(70);
@@ -147,7 +194,14 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
         });
       }
 
-      // Step 3: Create Reel in Backend
+      const startSecNum = Math.max(0, Number(trimStartSec) || 0);
+      const endSecNum = Math.max(startSecNum + 1, Number(trimEndSec) || 30);
+      const scheduledFor =
+        publishMode === 'scheduled'
+          ? new Date(Date.now() + scheduleOffsetHours * 3600 * 1000).toISOString()
+          : undefined;
+
+      // Step 3: Create Reel in Backend with Studio Metadata
       setUploadProgress(90);
       const res = await api.post('/reels', {
         videoUrl,
@@ -157,14 +211,32 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
           title: audioTitle.trim() || 'Original Audio',
           artist: audioArtist.trim() || 'Creator',
         },
-        duration: Math.min(Math.round((selectedVideo.duration || 30) / 1000), 90) || 30,
+        duration: Math.min(Math.round((selectedVideo.duration || 30000) / 1000), 90) || 30,
+        trimStartSec: startSecNum,
+        trimEndSec: endSecNum,
+        playbackSpeed,
+        clips: uploadedClips.length > 0 ? uploadedClips : undefined,
+        voiceoverUrl: voiceoverUrl.trim() ? voiceoverUrl.trim() : undefined,
+        musicVolume,
+        voiceoverVolume,
+        textOverlays: overlayText.trim()
+          ? [{ id: 'studio_ov_1', text: overlayText.trim(), color: '#F04BBE', y: 0.4 }]
+          : undefined,
+        status: publishMode,
+        scheduledFor,
       });
 
       setUploadProgress(100);
 
       if (res.success) {
-        Alert.alert('Success', 'Your Reel is now live!');
-        await loadReels(true);
+        const msg =
+          publishMode === 'draft'
+            ? 'Reel saved to Creator Studio drafts!'
+            : publishMode === 'scheduled'
+            ? `Reel scheduled for release in ${scheduleOffsetHours}h!`
+            : 'Your Reel is now live!';
+        Alert.alert('Success', msg);
+        if (publishMode === 'published') await loadReels(true);
         if (onPublished) onPublished();
         handleClose();
       } else {
@@ -180,10 +252,17 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
 
   const handleClose = () => {
     setSelectedVideo(null);
+    setExtraClips([]);
     setSelectedCover(null);
     setCaption('');
     setAudioTitle('Original Audio');
     setAudioArtist('');
+    setTrimStartSec('0');
+    setTrimEndSec('30');
+    setPlaybackSpeed(1);
+    setOverlayText('');
+    setVoiceoverUrl('');
+    setPublishMode('published');
     setIsUploading(false);
     onClose();
   };
@@ -348,6 +427,97 @@ export const ReelUploadModal: React.FC<ReelUploadModalProps> = ({
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+
+          {/* Step 8: Reels Studio Tools */}
+          <View style={styles.studioCard}>
+            <Text style={styles.studioTitle}>Reels Studio Tools</Text>
+
+            <Text style={styles.studioLabel}>Trim Window (sec) & Multi-Clip ({extraClips.length} extra clips)</Text>
+            <View style={styles.studioRow}>
+              <TextInput
+                value={trimStartSec}
+                onChangeText={setTrimStartSec}
+                keyboardType="numeric"
+                placeholder="Start s"
+                placeholderTextColor="#8E8E93"
+                style={[styles.studioSmallInput, { flex: 1 }]}
+              />
+              <TextInput
+                value={trimEndSec}
+                onChangeText={setTrimEndSec}
+                keyboardType="numeric"
+                placeholder="End s"
+                placeholderTextColor="#8E8E93"
+                style={[styles.studioSmallInput, { flex: 1 }]}
+              />
+              <TouchableOpacity onPress={handleAddExtraClip} style={styles.studioClipBtn}>
+                <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Add Clip</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.studioLabel}>Playback Speed</Text>
+            <View style={styles.studioChipsRow}>
+              {SPEED_OPTIONS.map((sp) => (
+                <TouchableOpacity
+                  key={sp}
+                  onPress={() => setPlaybackSpeed(sp)}
+                  style={[styles.studioChip, playbackSpeed === sp && styles.studioChipActive]}
+                >
+                  <Text style={styles.studioChipText}>{sp}x</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.studioLabel}>Text Overlay & Voiceover Mix</Text>
+            <TextInput
+              value={overlayText}
+              onChangeText={setOverlayText}
+              placeholder="Video text overlay (optional)"
+              placeholderTextColor="#8E8E93"
+              style={styles.studioFullInput}
+            />
+            <TextInput
+              value={voiceoverUrl}
+              onChangeText={setVoiceoverUrl}
+              placeholder="Voiceover audio URL (optional)"
+              placeholderTextColor="#8E8E93"
+              style={styles.studioFullInput}
+            />
+            <View style={styles.studioChipsRow}>
+              {[
+                { label: `Music ${Math.round(musicVolume * 100)}%`, onPress: () => setMusicVolume((v) => (v >= 1 ? 0.25 : Number((v + 0.25).toFixed(2)))) },
+                { label: `Voiceover ${Math.round(voiceoverVolume * 100)}%`, onPress: () => setVoiceoverVolume((v) => (v >= 1 ? 0.5 : 1)) },
+              ].map((mix) => (
+                <TouchableOpacity key={mix.label} onPress={mix.onPress} style={styles.studioChip}>
+                  <Text style={styles.studioChipText}>{mix.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.studioLabel}>Publish Timing</Text>
+            <View style={styles.studioChipsRow}>
+              {[
+                { key: 'published', label: 'Publish Now' },
+                { key: 'draft', label: 'Save Draft' },
+                { key: 'scheduled', label: `Schedule (+${scheduleOffsetHours}h)` },
+              ].map((mode) => (
+                <TouchableOpacity
+                  key={mode.key}
+                  onPress={() => {
+                    if (mode.key === 'scheduled' && publishMode === 'scheduled') {
+                      setScheduleOffsetHours((h) => (h === 2 ? 12 : h === 12 ? 24 : 2));
+                    } else {
+                      setPublishMode(mode.key as StudioStatus);
+                    }
+                  }}
+                  style={[styles.studioChip, publishMode === mode.key && styles.studioChipActive]}
+                >
+                  <Text style={styles.studioChipText}>{mode.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -586,6 +756,84 @@ const styles = StyleSheet.create({
   },
   audienceBtnTextActive: {
     color: '#FFFFFF',
+  },
+  studioCard: {
+    marginTop: spacing.lg,
+    backgroundColor: '#15101D',
+    borderWidth: 1,
+    borderColor: '#2B1F3A',
+    borderRadius: 16,
+    padding: 14,
+  },
+  studioTitle: {
+    color: '#F04BBE',
+    fontWeight: '800',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  studioLabel: {
+    color: '#D4CAE3',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  studioRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  studioSmallInput: {
+    backgroundColor: '#21152B',
+    borderWidth: 1,
+    borderColor: '#362348',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  studioClipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#A020F0',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  studioChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  studioChip: {
+    backgroundColor: '#21152B',
+    borderWidth: 1,
+    borderColor: '#362348',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  studioChipActive: {
+    backgroundColor: '#A020F0',
+    borderColor: '#F04BBE',
+  },
+  studioChipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  studioFullInput: {
+    backgroundColor: '#21152B',
+    borderWidth: 1,
+    borderColor: '#362348',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 13,
+    marginBottom: 8,
   },
 });
 

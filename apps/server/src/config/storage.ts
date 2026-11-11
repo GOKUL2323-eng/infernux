@@ -26,7 +26,16 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  const allowedMimePrefixes = ['image/', 'video/', 'audio/', 'application/pdf'];
+  const allowedMimePrefixes = [
+    'image/',
+    'video/',
+    'audio/',
+    'application/pdf',
+    'text/',
+    'application/zip',
+    'application/vnd.openxmlformats-officedocument',
+    'application/msword',
+  ];
   const isAllowed = allowedMimePrefixes.some((prefix) => file.mimetype.startsWith(prefix));
 
   if (isAllowed) {

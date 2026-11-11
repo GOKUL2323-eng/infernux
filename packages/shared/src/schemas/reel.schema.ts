@@ -14,6 +14,38 @@ export const createReelSchema = z.object({
       audioUrl: z.string().url().optional(),
     })
     .optional(),
+  trimStartSec: z.number().min(0).optional(),
+  trimEndSec: z.number().min(0).optional(),
+  playbackSpeed: z.number().min(0.25).max(3).optional(),
+  clips: z
+    .array(
+      z.object({
+        videoUrl: z.string().url(),
+        startSec: z.number().min(0),
+        endSec: z.number().min(0),
+        speed: z.number().min(0.25).max(3).optional(),
+      })
+    )
+    .max(10)
+    .optional(),
+  voiceoverUrl: z.string().url().optional(),
+  musicVolume: z.number().min(0).max(1).optional(),
+  voiceoverVolume: z.number().min(0).max(1).optional(),
+  textOverlays: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string().min(1).max(120),
+        color: z.string().optional(),
+        y: z.number().optional(),
+      })
+    )
+    .max(10)
+    .optional(),
+  coverTimeSec: z.number().min(0).optional(),
+  status: z.enum(['draft', 'scheduled', 'published']).default('published'),
+  scheduledFor: z.string().optional(),
+  collaboratorIds: z.array(z.string()).max(10).optional(),
 });
 
 export const addReelCommentSchema = z.object({

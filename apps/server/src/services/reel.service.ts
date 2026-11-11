@@ -17,6 +17,13 @@ export class ReelService {
       }
     }
 
+    const status = input.status || 'published';
+    const scheduledFor =
+      status === 'scheduled' && input.scheduledFor ? new Date(input.scheduledFor) : undefined;
+    const collabInvites = (input.collaboratorIds || [])
+      .filter((id) => id !== creatorId)
+      .map((id) => ({ userId: new mongoose.Types.ObjectId(id), status: 'pending' as const }));
+
     const reel = new Reel({
       creatorId,
       videoUrl: input.videoUrl,
@@ -25,10 +32,25 @@ export class ReelService {
       hashtags,
       audio: input.audio,
       duration: input.duration,
+      trimStartSec: input.trimStartSec,
+      trimEndSec: input.trimEndSec,
+      playbackSpeed: input.playbackSpeed || 1,
+      clips: input.clips || [],
+      voiceoverUrl: input.voiceoverUrl,
+      musicVolume: input.musicVolume,
+      voiceoverVolume: input.voiceoverVolume,
+      textOverlays: input.textOverlays || [],
+      coverTimeSec: input.coverTimeSec,
+      status,
+      scheduledFor,
+      collaboratorIds: [],
+      collabInvites,
     });
     await reel.save();
 
-    await User.findByIdAndUpdate(creatorId, { $inc: { reelsCount: 1 } });
+    if (status === 'published') {
+      await User.findByIdAndUpdate(creatorId, { $inc: { reelsCount: 1 } });
+    }
 
     const creator = await User.findById(creatorId).select('username displayName avatarUrl isVerified');
 
@@ -48,6 +70,19 @@ export class ReelService {
       hashtags: reel.hashtags,
       audio: reel.audio,
       duration: reel.duration,
+      trimStartSec: reel.trimStartSec,
+      trimEndSec: reel.trimEndSec,
+      playbackSpeed: reel.playbackSpeed,
+      clips: reel.clips,
+      voiceoverUrl: reel.voiceoverUrl,
+      musicVolume: reel.musicVolume,
+      voiceoverVolume: reel.voiceoverVolume,
+      textOverlays: reel.textOverlays,
+      coverTimeSec: reel.coverTimeSec,
+      status: reel.status,
+      scheduledFor: reel.scheduledFor?.toISOString(),
+      collaborators: [],
+      collabInvites: collabInvites.map((c) => ({ userId: c.userId.toString(), status: c.status })),
       viewsCount: 0,
       likesCount: 0,
       commentsCount: 0,
@@ -64,7 +99,9 @@ export class ReelService {
     beforeCursor?: string,
     options?: { feedType?: 'for_you' | 'following'; query?: string; hashtag?: string }
   ): Promise<PaginatedResponse<ReelSummary>> {
-    const query: any = {};
+    const query: any = {
+      status: { $in: ['published', null] },
+    };
     if (beforeCursor) {
       const cursorReel = await Reel.findById(beforeCursor);
       if (cursorReel) {
@@ -94,6 +131,7 @@ export class ReelService {
 
     const reels = await Reel.find(query)
       .populate('creatorId', 'username displayName avatarUrl isVerified')
+      .populate('collaboratorIds', 'username displayName avatarUrl isVerified')
       .sort({ createdAt: -1 })
       .limit(limit + 1);
 
@@ -151,6 +189,25 @@ export class ReelService {
         hashtags: r.hashtags,
         audio: r.audio,
         duration: r.duration,
+        trimStartSec: r.trimStartSec,
+        trimEndSec: r.trimEndSec,
+        playbackSpeed: r.playbackSpeed,
+        clips: r.clips,
+        voiceoverUrl: r.voiceoverUrl,
+        musicVolume: r.musicVolume,
+        voiceoverVolume: r.voiceoverVolume,
+        textOverlays: r.textOverlays,
+        coverTimeSec: r.coverTimeSec,
+        status: r.status || 'published',
+        collaborators: ((r.collaboratorIds || []) as any[])
+          .filter((c) => c && c.username)
+          .map((c) => ({
+            id: c._id.toString(),
+            username: c.username,
+            displayName: c.displayName,
+            avatarUrl: c.avatarUrl,
+            isVerified: c.isVerified,
+          })),
         viewsCount: r.viewsCount,
         likesCount: r.likesCount,
         commentsCount: r.commentsCount,
@@ -208,7 +265,10 @@ export class ReelService {
   }
 
   async getUserReels(targetUserId: string, limit = 20): Promise<ReelSummary[]> {
-    const reels = await Reel.find({ creatorId: targetUserId })
+    const reels = await Reel.find({
+      $or: [{ creatorId: targetUserId }, { collaboratorIds: targetUserId }],
+      status: { $in: ['published', null] },
+    })
       .populate('creatorId', 'username displayName avatarUrl isVerified')
       .sort({ createdAt: -1 })
       .limit(limit);
@@ -230,6 +290,25 @@ export class ReelService {
         hashtags: r.hashtags,
         audio: r.audio,
         duration: r.duration,
+        trimStartSec: r.trimStartSec,
+        trimEndSec: r.trimEndSec,
+        playbackSpeed: r.playbackSpeed,
+        clips: r.clips,
+        voiceoverUrl: r.voiceoverUrl,
+        musicVolume: r.musicVolume,
+        voiceoverVolume: r.voiceoverVolume,
+        textOverlays: r.textOverlays,
+        coverTimeSec: r.coverTimeSec,
+        status: r.status || 'published',
+        collaborators: ((r.collaboratorIds || []) as any[])
+          .filter((c) => c && c.username)
+          .map((c) => ({
+            id: c._id.toString(),
+            username: c.username,
+            displayName: c.displayName,
+            avatarUrl: c.avatarUrl,
+            isVerified: c.isVerified,
+          })),
         viewsCount: r.viewsCount,
         likesCount: r.likesCount,
         commentsCount: r.commentsCount,
@@ -312,6 +391,40 @@ export class ReelService {
   async recordShare(reelId: string): Promise<number> {
     const reel = await Reel.findByIdAndUpdate(reelId, { $inc: { sharesCount: 1 } }, { new: true });
     return reel?.sharesCount || 0;
+  }
+
+  async respondCollabInvite(
+    userId: string,
+    reelId: string,
+    accept: boolean
+  ): Promise<{ accepted: boolean }> {
+    const reel = await Reel.findById(reelId);
+    if (!reel) throw new Error('Reel not found');
+
+    const invite = (reel.collabInvites || []).find((i) => i.userId.toString() === userId);
+    if (!invite) throw new Error('Reel collaboration invite not found');
+
+    invite.status = accept ? 'accepted' : 'declined';
+    if (accept && !reel.collaboratorIds.some((id) => id.toString() === userId)) {
+      reel.collaboratorIds.push(new mongoose.Types.ObjectId(userId));
+    }
+    await reel.save();
+    return { accepted: accept };
+  }
+
+  async publishDueScheduledReels(now = new Date()): Promise<number> {
+    const due = await Reel.find({
+      status: 'scheduled',
+      scheduledFor: { $lte: now },
+    }).limit(50);
+
+    for (const r of due) {
+      r.status = 'published';
+      r.scheduledFor = undefined;
+      await r.save();
+      await User.findByIdAndUpdate(r.creatorId, { $inc: { reelsCount: 1 } });
+    }
+    return due.length;
   }
 }
 

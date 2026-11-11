@@ -3,9 +3,16 @@ import { Conversation, IConversationDocument } from '../models/Conversation';
 import { Message, IMessageDocument } from '../models/Message';
 import { User } from '../models/User';
 import { Room } from '../models/Room';
+import { ChatFolder } from '../models/ChatFolder';
+import { ConversationDraft } from '../models/ConversationDraft';
+import { SavedMessage } from '../models/SavedMessage';
+import { MessageReminder } from '../models/MessageReminder';
+import { Notification } from '../models/Notification';
 import { deleteMediaAttachments } from '../utils/fileDeletion';
 import { getIO } from '../sockets';
 import { logger } from '../utils/logger';
+import { streakService } from './streak.service';
+import { translationService } from './translation.service';
 import {
   SendMessageInput,
   EditMessageInput,
@@ -17,18 +24,158 @@ import {
   SOCKET_EVENTS,
   DisappearingMode,
   MediaSavePolicy,
+  InteractMessageInput,
+  InteractiveMessageData,
 } from '@infernux/shared';
 
 export class ChatService {
-  async getConversations(userId: string): Promise<ConversationSummary[]> {
-    const conversations = await Conversation.find({ participants: userId })
-      .populate('participants', 'username displayName avatarUrl isVerified isOnline lastSeen')
-      .populate('lastMessage.senderId', 'username displayName avatarUrl')
-      .sort({ updatedAt: -1 });
+  private buildPreviewLabel(
+    contentType: string,
+    content: string,
+    viewOnce?: boolean,
+    interactiveData?: InteractiveMessageData
+  ): string {
+    if (viewOnce) return '[View Once Media]';
+    if (interactiveData) {
+      if (interactiveData.kind === 'poll') return `Poll: ${interactiveData.question || content}`;
+      if (interactiveData.kind === 'quiz') return `Quiz: ${interactiveData.question || content}`;
+      if (interactiveData.kind === 'voting_card') return `Vote: ${interactiveData.question || content}`;
+      if (interactiveData.kind === 'event') return `Event: ${interactiveData.event?.title || content}`;
+      if (interactiveData.kind === 'checklist') return `Checklist: ${interactiveData.question || 'Items'}`;
+      if (interactiveData.kind === 'location') return `Location: ${interactiveData.location?.label || 'Shared location'}`;
+      if (interactiveData.kind === 'contact') return `Contact: ${interactiveData.contact?.displayName || 'Shared contact'}`;
+      if (interactiveData.kind === 'task') return `Task: ${interactiveData.task?.title || 'Assigned task'}`;
+    }
+    if (contentType === 'text') return content;
+    return `[${contentType}]`;
+  }
 
+  formatMessageSummary(
+    m: IMessageDocument | any,
+    viewerId: string,
+    savedInfo?: { isImportant: boolean }
+  ): MessageSummary {
+    const sender = m.senderId as any;
+    const senderId = sender?._id?.toString() || sender?.toString() || '';
+    const isViewerRecipient = senderId !== viewerId;
+    const hasViewed = m.viewedBy && m.viewedBy.some((v: any) => v.userId?.toString() === viewerId);
+    const isViewOnceExpiredForUser = Boolean(
+      m.viewOnce && (m.isExpired || (isViewerRecipient && hasViewed))
+    );
+
+    const secretReactions = (m.secretReactions || []).map((sr: any) => {
+      const srUserId = sr.userId?._id?.toString() || sr.userId?.toString() || '';
+      const revealedList: string[] = (sr.revealedToUserIds || []).map((id: any) => id.toString());
+      const isRevealed = srUserId === viewerId || revealedList.includes(viewerId);
+      return {
+        userId: srUserId,
+        emoji: isRevealed ? sr.emoji : '🔒',
+        isRevealed,
+        createdAt: sr.createdAt?.toISOString() || new Date().toISOString(),
+      };
+    });
+
+    return {
+      id: m._id.toString(),
+      conversationId: m.conversationId.toString(),
+      senderId,
+      sender: {
+        id: senderId,
+        username: sender?.username || 'Unknown',
+        displayName: sender?.displayName || 'Unknown',
+        avatarUrl: sender?.avatarUrl,
+        isVerified: sender?.isVerified,
+      },
+      contentType: m.contentType,
+      content: m.isDeleted
+        ? 'This message was deleted'
+        : isViewOnceExpiredForUser
+        ? 'Opened'
+        : m.content,
+      attachments: m.isDeleted || isViewOnceExpiredForUser ? [] : m.attachments,
+      replyTo:
+        m.replyTo && m.replyTo.id
+          ? {
+              id: m.replyTo.id.toString(),
+              senderDisplayName: m.replyTo.senderDisplayName,
+              content: m.replyTo.content,
+              contentType: m.replyTo.contentType,
+            }
+          : undefined,
+      forwardedFrom:
+        m.forwardedFrom && m.forwardedFrom.messageId
+          ? {
+              messageId: m.forwardedFrom.messageId.toString(),
+              senderDisplayName: m.forwardedFrom.senderDisplayName,
+              conversationId: m.forwardedFrom.conversationId?.toString(),
+            }
+          : undefined,
+      reactions: (m.reactions || []).map((r: any) => ({
+        userId: r.userId?._id?.toString() || r.userId?.toString(),
+        emoji: r.emoji,
+        createdAt: r.createdAt?.toISOString() || new Date().toISOString(),
+      })),
+      secretReactions: secretReactions.length > 0 ? secretReactions : undefined,
+      interactiveData: m.isDeleted ? undefined : m.interactiveData,
+      translations: m.translations,
+      voiceTranscript: m.voiceTranscript,
+      receipts: (m.receipts || []).map((rc: any) => ({
+        userId: rc.userId.toString(),
+        status: rc.status,
+        updatedAt: rc.updatedAt?.toISOString() || new Date().toISOString(),
+      })),
+      isEdited: Boolean(m.isEdited),
+      isDeleted: Boolean(m.isDeleted),
+      isPinned: Boolean(m.isPinned),
+      pinnedAt: m.pinnedAt?.toISOString(),
+      pinnedBy: m.pinnedBy?.toString(),
+      isScheduled: Boolean(m.isScheduled),
+      scheduledFor: m.scheduledFor?.toISOString(),
+      scheduleStatus: m.scheduleStatus,
+      isSavedByMe: Boolean(savedInfo),
+      isImportant: Boolean(savedInfo?.isImportant),
+      expiresAt: m.expiresAt?.toISOString(),
+      disappearingMode: m.disappearingMode,
+      viewOnce: Boolean(m.viewOnce),
+      viewedAt: m.viewedAt?.toISOString(),
+      isExpired: Boolean(m.isExpired),
+      mediaSavePolicy: m.mediaSavePolicy,
+      savedBy: (m.savedBy || []).map((s: any) => ({
+        userId: s.userId?._id?.toString() || s.userId?.toString(),
+        username: s.userId?.username,
+        savedAt: s.savedAt?.toISOString() || new Date().toISOString(),
+      })),
+      metadata: m.metadata,
+      createdAt: m.createdAt.toISOString(),
+      updatedAt: m.updatedAt.toISOString(),
+    };
+  }
+
+  async getConversations(userId: string): Promise<ConversationSummary[]> {
+    const [conversations, folders, drafts, streakMap] = await Promise.all([
+      Conversation.find({ participants: userId })
+        .populate('participants', 'username displayName avatarUrl isVerified isOnline lastSeen')
+        .populate('lastMessage.senderId', 'username displayName avatarUrl')
+        .sort({ updatedAt: -1 }),
+      ChatFolder.find({ userId }),
+      ConversationDraft.find({ userId }),
+      streakService.getStreakMapByPartner(userId),
+    ]);
+
+    const folderMap = new Map<string, string[]>();
+    for (const folder of folders) {
+      const fId = folder._id.toString();
+      for (const cId of folder.conversationIds) {
+        const key = cId.toString();
+        folderMap.set(key, [...(folderMap.get(key) || []), fId]);
+      }
+    }
+
+    const draftMap = new Map(drafts.map((d) => [d.conversationId.toString(), d.content]));
     const summaries: ConversationSummary[] = [];
 
     for (const conv of conversations) {
+      const convId = conv._id.toString();
       const participants = (conv.participants as any[]).map((p) => ({
         id: p._id.toString(),
         username: p.username,
@@ -39,27 +186,28 @@ export class ChatService {
         lastSeen: p.lastSeen?.toISOString(),
       }));
 
-      // Calculate unread count (messages sent after last read receipt)
       const unreadCount = await Message.countDocuments({
         conversationId: conv._id,
         senderId: { $ne: userId },
+        isScheduled: { $ne: true },
         'receipts.userId': { $ne: userId },
       });
 
       let title = conv.title || '';
       let avatarUrl = conv.avatarUrl;
+      let streak;
 
-      // In direct 1:1 chats, display the other person's name and avatar
       if (conv.type === 'direct') {
         const other = participants.find((p) => p.id !== userId);
         if (other) {
           title = other.displayName;
           avatarUrl = other.avatarUrl;
+          streak = streakMap.get(other.id);
         }
       }
 
       summaries.push({
-        id: conv._id.toString(),
+        id: convId,
         type: conv.type,
         title,
         avatarUrl,
@@ -67,7 +215,7 @@ export class ChatService {
         lastMessage: conv.lastMessage
           ? {
               id: conv.lastMessage.id?.toString() || '',
-              conversationId: conv._id.toString(),
+              conversationId: convId,
               senderId: conv.lastMessage.senderId ? (conv.lastMessage.senderId as any)._id?.toString() : '',
               sender: {
                 id: conv.lastMessage.senderId ? (conv.lastMessage.senderId as any)._id?.toString() : '',
@@ -89,6 +237,11 @@ export class ChatService {
         unreadCount,
         isMuted: conv.mutedBy.some((id) => id.toString() === userId),
         isPinned: conv.pinnedBy.some((id) => id.toString() === userId),
+        isPriority: (conv.priorityBy || []).some((id) => id.toString() === userId),
+        isArchived: (conv.archivedBy || []).some((id) => id.toString() === userId),
+        folderIds: folderMap.get(convId) || [],
+        draftContent: draftMap.get(convId),
+        streak,
         updatedAt: conv.updatedAt.toISOString(),
         roomId: conv.roomId?.toString(),
       });
@@ -110,6 +263,7 @@ export class ChatService {
 
     const query: any = {
       conversationId,
+      isScheduled: { $ne: true },
       $or: [
         { expiresAt: { $exists: false } },
         { expiresAt: null },
@@ -135,68 +289,17 @@ export class ChatService {
     const items = hasMore ? messages.slice(0, limit) : messages;
     const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]._id.toString() : null;
 
-    const formattedItems: MessageSummary[] = items.map((m) => {
-      const sender = m.senderId as any;
-      const isViewerRecipient = sender?._id?.toString() !== userId;
-      const hasViewed = m.viewedBy && m.viewedBy.some((v: any) => v.userId?.toString() === userId);
-      const isViewOnceExpiredForUser = m.viewOnce && (m.isExpired || (isViewerRecipient && hasViewed));
+    const savedRecords = await SavedMessage.find({
+      userId,
+      messageId: { $in: items.map((i) => i._id) },
+    }).select('messageId isImportant');
+    const savedMap = new Map(
+      savedRecords.map((s) => [s.messageId.toString(), { isImportant: s.isImportant }])
+    );
 
-      return {
-        id: m._id.toString(),
-        conversationId: m.conversationId.toString(),
-        senderId: sender ? sender._id.toString() : '',
-        sender: {
-          id: sender ? sender._id.toString() : '',
-          username: sender?.username || 'Unknown',
-          displayName: sender?.displayName || 'Unknown',
-          avatarUrl: sender?.avatarUrl,
-          isVerified: sender?.isVerified,
-        },
-        contentType: m.contentType,
-        content: m.isDeleted
-          ? 'This message was deleted'
-          : isViewOnceExpiredForUser
-          ? 'Opened'
-          : m.content,
-        attachments: m.isDeleted || isViewOnceExpiredForUser ? [] : m.attachments,
-        replyTo:
-          m.replyTo && m.replyTo.id
-            ? {
-                id: m.replyTo.id.toString(),
-                senderDisplayName: m.replyTo.senderDisplayName,
-                content: m.replyTo.content,
-                contentType: m.replyTo.contentType,
-              }
-            : undefined,
-        reactions: m.reactions.map((r: any) => ({
-          userId: r.userId?._id?.toString() || r.userId?.toString(),
-          emoji: r.emoji,
-          createdAt: r.createdAt.toISOString(),
-        })),
-        receipts: m.receipts.map((rc: any) => ({
-          userId: rc.userId.toString(),
-          status: rc.status,
-          updatedAt: rc.updatedAt.toISOString(),
-        })),
-        isEdited: m.isEdited,
-        isDeleted: m.isDeleted,
-        isPinned: m.isPinned,
-        expiresAt: m.expiresAt?.toISOString(),
-        disappearingMode: m.disappearingMode,
-        viewOnce: m.viewOnce,
-        viewedAt: m.viewedAt?.toISOString(),
-        isExpired: m.isExpired,
-        mediaSavePolicy: m.mediaSavePolicy,
-        savedBy: (m.savedBy || []).map((s: any) => ({
-          userId: s.userId?._id?.toString() || s.userId?.toString(),
-          username: s.userId?.username,
-          savedAt: s.savedAt?.toISOString() || new Date().toISOString(),
-        })),
-        metadata: m.metadata,
-        createdAt: m.createdAt.toISOString(),
-        updatedAt: m.updatedAt.toISOString(),
-      };
-    });
+    const formattedItems: MessageSummary[] = items.map((m) =>
+      this.formatMessageSummary(m, userId, savedMap.get(m._id.toString()))
+    );
 
     return {
       items: formattedItems.reverse(), // Client expects chronological top-to-bottom
@@ -225,7 +328,7 @@ export class ChatService {
     const isViewOnce = Boolean(input.viewOnce);
     let expiresAt: Date | undefined;
 
-    // Check if this conversation is linked to a private room
+    // Handle disappearing rules (both private rooms and explicit per-message timer)
     if (conv.type === 'room' && conv.roomId) {
       const room = await Room.findById(conv.roomId);
       if (!room) {
@@ -237,14 +340,26 @@ export class ChatService {
 
       mediaSavePolicy = room.mediaSavePolicy;
       disappearingMode = (input.disappearingMode || room.disappearingMode || '24h') as DisappearingMode;
+    } else if (input.disappearingMode && input.disappearingMode !== 'off') {
+      disappearingMode = input.disappearingMode;
+    }
 
-      if (isViewOnce) {
-        disappearingMode = 'after_view';
-      } else if (disappearingMode === '24h') {
-        expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
-      } else if (disappearingMode === '7d') {
-        expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+    if (isViewOnce) {
+      disappearingMode = 'after_view';
+    } else if (disappearingMode === '24h') {
+      expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
+    } else if (disappearingMode === '7d') {
+      expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+    }
+
+    let scheduledForDate: Date | undefined;
+    let isFutureSchedule = false;
+    if (input.scheduledFor) {
+      scheduledForDate = new Date(input.scheduledFor);
+      if (Number.isNaN(scheduledForDate.getTime())) {
+        throw new Error('Invalid scheduledFor timestamp');
       }
+      isFutureSchedule = scheduledForDate.getTime() > Date.now() + 2000;
     }
 
     let replyToObj;
@@ -267,6 +382,7 @@ export class ChatService {
       content: input.content,
       attachments: input.attachments || [],
       replyTo: replyToObj,
+      interactiveData: input.interactiveData,
       clientTempId: input.clientTempId,
       metadata: input.metadata,
       receipts: [{ userId: senderId, status: 'sent', updatedAt: new Date() }],
@@ -275,105 +391,58 @@ export class ChatService {
       mediaSavePolicy,
       expiresAt,
       isExpired: false,
+      isScheduled: isFutureSchedule,
+      scheduledFor: scheduledForDate,
+      scheduleStatus: isFutureSchedule ? 'pending' : undefined,
     });
     await message.save();
 
-    // Update conversation's last message
-    conv.lastMessage = {
-      id: message._id,
-      senderId: new mongoose.Types.ObjectId(senderId),
-      content: isViewOnce
-        ? '[View Once Media]'
-        : input.contentType === 'text'
-        ? input.content
-        : `[${input.contentType}]`,
-      contentType: input.contentType,
-      createdAt: message.createdAt,
-    };
-    await conv.save();
+    if (!isFutureSchedule) {
+      conv.lastMessage = {
+        id: message._id,
+        senderId: new mongoose.Types.ObjectId(senderId),
+        content: this.buildPreviewLabel(
+          input.contentType,
+          input.content,
+          isViewOnce,
+          input.interactiveData
+        ),
+        contentType: input.contentType,
+        createdAt: message.createdAt,
+      };
+      await conv.save();
+      await ConversationDraft.deleteOne({ userId: senderId, conversationId: conv._id });
+      streakService.recordDirectInteraction(senderId, conv).catch((err) => {
+        logger.warn('Failed to update friend streak', 'ChatService', err);
+      });
+    }
 
-    const sender = await User.findById(senderId).select('username displayName avatarUrl isVerified');
+    await message.populate('senderId', 'username displayName avatarUrl isVerified');
+    const summary = this.formatMessageSummary(message, senderId);
 
-    return {
-      id: message._id.toString(),
-      conversationId: conv._id.toString(),
-      senderId,
-      sender: {
-        id: senderId,
-        username: sender?.username || '',
-        displayName: sender?.displayName || '',
-        avatarUrl: sender?.avatarUrl,
-        isVerified: sender?.isVerified,
-      },
-      contentType: message.contentType,
-      content: message.content,
-      attachments: message.attachments,
-      replyTo:
-        message.replyTo && message.replyTo.id
-          ? {
-              id: message.replyTo.id.toString(),
-              senderDisplayName: message.replyTo.senderDisplayName,
-              content: message.replyTo.content,
-              contentType: message.replyTo.contentType,
-            }
-          : undefined,
-      reactions: [],
-      receipts: [{ userId: senderId, status: 'sent', updatedAt: message.createdAt.toISOString() }],
-      isEdited: false,
-      isDeleted: false,
-      isPinned: false,
-      expiresAt: message.expiresAt?.toISOString(),
-      disappearingMode: message.disappearingMode,
-      viewOnce: message.viewOnce,
-      isExpired: message.isExpired,
-      mediaSavePolicy: message.mediaSavePolicy,
-      createdAt: message.createdAt.toISOString(),
-      updatedAt: message.updatedAt.toISOString(),
-      metadata: message.metadata,
-    };
+    if (!isFutureSchedule) {
+      const io = getIO();
+      if (io) {
+        io.to(`conversation:${conv._id}`).emit(SOCKET_EVENTS.NEW_MESSAGE, summary);
+      }
+    }
+
+    return summary;
   }
 
   async editMessage(messageId: string, userId: string, input: EditMessageInput): Promise<MessageSummary> {
-    const msg = await Message.findById(messageId);
+    const msg = await Message.findById(messageId).populate('senderId', 'username displayName avatarUrl isVerified');
     if (!msg) throw new Error('Message not found');
-    if (msg.senderId.toString() !== userId) throw new Error('Permission denied: You can only edit your own messages');
+    if (msg.senderId._id ? msg.senderId._id.toString() !== userId : msg.senderId.toString() !== userId) {
+      throw new Error('Permission denied: You can only edit your own messages');
+    }
     if (msg.isDeleted) throw new Error('Cannot edit a deleted message');
 
     msg.content = input.content;
     msg.isEdited = true;
     await msg.save();
 
-    const sender = await User.findById(userId).select('username displayName avatarUrl isVerified');
-    return {
-      id: msg._id.toString(),
-      conversationId: msg.conversationId.toString(),
-      senderId: userId,
-      sender: {
-        id: userId,
-        username: sender?.username || '',
-        displayName: sender?.displayName || '',
-        avatarUrl: sender?.avatarUrl,
-        isVerified: sender?.isVerified,
-      },
-      contentType: msg.contentType,
-      content: msg.content,
-      attachments: msg.attachments,
-      reactions: (msg.reactions || []).map((r: any) => ({
-        userId: r.userId.toString(),
-        emoji: r.emoji,
-        createdAt: r.createdAt.toISOString(),
-      })),
-      receipts: (msg.receipts || []).map((rc: any) => ({
-        userId: rc.userId.toString(),
-        status: rc.status,
-        updatedAt: rc.updatedAt.toISOString(),
-      })),
-      isEdited: true,
-      isDeleted: false,
-      isPinned: msg.isPinned,
-      createdAt: msg.createdAt.toISOString(),
-      updatedAt: msg.updatedAt.toISOString(),
-    };
+    return this.formatMessageSummary(msg, userId);
   }
 
   async deleteMessage(messageId: string, userId: string): Promise<void> {
@@ -605,6 +674,463 @@ export class ChatService {
     if (count > 0) {
       logger.info(`Cleaned up and purged ${count} expired private messages`, 'ChatService');
     }
+    return count;
+  }
+
+  // --- ADVANCED MESSAGING UPGRADES ---
+
+  async pinMessage(messageId: string, userId: string, pinned: boolean): Promise<MessageSummary> {
+    const msg = await Message.findById(messageId).populate('senderId', 'username displayName avatarUrl isVerified');
+    if (!msg || msg.isDeleted) throw new Error('Message not found');
+
+    const isParticipant = await Conversation.exists({ _id: msg.conversationId, participants: userId });
+    if (!isParticipant) throw new Error('Access denied: Not a conversation participant');
+
+    msg.isPinned = pinned;
+    msg.pinnedAt = pinned ? new Date() : undefined;
+    msg.pinnedBy = pinned ? new mongoose.Types.ObjectId(userId) : undefined;
+    await msg.save();
+
+    const summary = this.formatMessageSummary(msg, userId);
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_PINNED, {
+        conversationId: msg.conversationId.toString(),
+        messageId: msg._id.toString(),
+        isPinned: pinned,
+        pinnedBy: userId,
+        pinnedAt: msg.pinnedAt?.toISOString(),
+      });
+    }
+
+    return summary;
+  }
+
+  private cloneInteractiveForForward(data?: InteractiveMessageData): InteractiveMessageData | undefined {
+    if (!data) return undefined;
+    return {
+      ...data,
+      options: data.options?.map((o) => ({ ...o, voterIds: [] })),
+      checklistItems: data.checklistItems?.map((item) => ({ ...item, completed: false, completedBy: undefined })),
+      event: data.event
+        ? { ...data.event, rsvpGoingIds: [], rsvpMaybeIds: [], rsvpDeclinedIds: [] }
+        : undefined,
+    };
+  }
+
+  async forwardMessage(
+    messageId: string,
+    userId: string,
+    targetConversationIds: string[]
+  ): Promise<MessageSummary[]> {
+    const srcMsg = await Message.findById(messageId).populate('senderId', 'displayName username');
+    if (!srcMsg || srcMsg.isDeleted || srcMsg.isExpired) {
+      throw new Error('Source message not available for forwarding');
+    }
+    if (srcMsg.viewOnce) {
+      throw new Error('View-once messages cannot be forwarded');
+    }
+
+    const srcMember = await Conversation.exists({ _id: srcMsg.conversationId, participants: userId });
+    if (!srcMember) throw new Error('Access denied to source message');
+
+    const forwardedItems: MessageSummary[] = [];
+    const originalSenderName =
+      (srcMsg.senderId as any)?.displayName || (srcMsg.senderId as any)?.username || 'User';
+
+    for (const targetConvId of targetConversationIds) {
+      const targetConv = await Conversation.findOne({ _id: targetConvId, participants: userId });
+      if (!targetConv) {
+        throw new Error(`Access denied to target conversation ${targetConvId}`);
+      }
+
+      const cloned = new Message({
+        conversationId: targetConv._id,
+        senderId: userId,
+        contentType: srcMsg.contentType,
+        content: srcMsg.content,
+        attachments: srcMsg.attachments,
+        interactiveData: this.cloneInteractiveForForward(srcMsg.interactiveData),
+        forwardedFrom: {
+          messageId: srcMsg._id,
+          senderDisplayName: originalSenderName,
+          conversationId: srcMsg.conversationId,
+        },
+        receipts: [{ userId, status: 'sent', updatedAt: new Date() }],
+      });
+      await cloned.save();
+
+      targetConv.lastMessage = {
+        id: cloned._id,
+        senderId: new mongoose.Types.ObjectId(userId),
+        content: this.buildPreviewLabel(
+          cloned.contentType,
+          cloned.content,
+          false,
+          cloned.interactiveData
+        ),
+        contentType: cloned.contentType,
+        createdAt: cloned.createdAt,
+      };
+      await targetConv.save();
+
+      await cloned.populate('senderId', 'username displayName avatarUrl isVerified');
+      const summary = this.formatMessageSummary(cloned, userId);
+      forwardedItems.push(summary);
+
+      const io = getIO();
+      if (io) {
+        io.to(`conversation:${targetConvId}`).emit(SOCKET_EVENTS.NEW_MESSAGE, summary);
+      }
+    }
+
+    return forwardedItems;
+  }
+
+  async interactWithMessage(
+    messageId: string,
+    userId: string,
+    input: InteractMessageInput
+  ): Promise<MessageSummary> {
+    const msg = await Message.findById(messageId).populate('senderId', 'username displayName avatarUrl isVerified');
+    if (!msg || msg.isDeleted || !msg.interactiveData) {
+      throw new Error('Interactive message not found');
+    }
+
+    const isMember = await Conversation.exists({ _id: msg.conversationId, participants: userId });
+    if (!isMember) throw new Error('Access denied: Not a participant');
+
+    const data: InteractiveMessageData = JSON.parse(JSON.stringify(msg.interactiveData));
+
+    if (input.action === 'vote' && data.options) {
+      if (!input.optionId) throw new Error('optionId is required for vote');
+      const target = data.options.find((o) => o.id === input.optionId);
+      if (!target) throw new Error('Poll option not found');
+
+      if (!data.allowMultiple) {
+        for (const opt of data.options) {
+          opt.voterIds = opt.voterIds.filter((id) => id !== userId);
+        }
+        target.voterIds.push(userId);
+      } else {
+        const exists = target.voterIds.includes(userId);
+        target.voterIds = exists
+          ? target.voterIds.filter((id) => id !== userId)
+          : [...target.voterIds, userId];
+      }
+    } else if (input.action === 'toggle_checklist' && data.checklistItems) {
+      const item = data.checklistItems.find((i) => i.id === input.itemId);
+      if (!item) throw new Error('Checklist item not found');
+      item.completed = !item.completed;
+      item.completedBy = item.completed ? userId : undefined;
+    } else if (input.action === 'rsvp' && data.event && input.rsvpStatus) {
+      data.event.rsvpGoingIds = data.event.rsvpGoingIds.filter((id) => id !== userId);
+      data.event.rsvpMaybeIds = data.event.rsvpMaybeIds.filter((id) => id !== userId);
+      data.event.rsvpDeclinedIds = data.event.rsvpDeclinedIds.filter((id) => id !== userId);
+      if (input.rsvpStatus === 'going') data.event.rsvpGoingIds.push(userId);
+      else if (input.rsvpStatus === 'maybe') data.event.rsvpMaybeIds.push(userId);
+      else data.event.rsvpDeclinedIds.push(userId);
+    } else if (input.action === 'update_task' && data.task && input.taskStatus) {
+      data.task.status = input.taskStatus;
+    } else {
+      throw new Error('Unsupported interactive action for this message');
+    }
+
+    msg.interactiveData = data;
+    msg.markModified('interactiveData');
+    await msg.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_INTERACTIVE_UPDATED, {
+        conversationId: msg.conversationId.toString(),
+        messageId: msg._id.toString(),
+        interactiveData: data,
+      });
+    }
+
+    return this.formatMessageSummary(msg, userId);
+  }
+
+  async addSecretReaction(
+    messageId: string,
+    userId: string,
+    emoji: string
+  ): Promise<MessageSummary> {
+    const msg = await Message.findById(messageId).populate('senderId', 'username displayName avatarUrl isVerified');
+    if (!msg || msg.isDeleted) throw new Error('Message not found');
+
+    const isMember = await Conversation.exists({ _id: msg.conversationId, participants: userId });
+    if (!isMember) throw new Error('Access denied: Not a participant');
+
+    msg.secretReactions = (msg.secretReactions || []).filter((sr) => sr.userId.toString() !== userId);
+    msg.secretReactions.push({
+      userId: new mongoose.Types.ObjectId(userId),
+      emoji,
+      revealedToUserIds: [new mongoose.Types.ObjectId(userId)],
+      createdAt: new Date(),
+    });
+    await msg.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_SECRET_REACTION, {
+        conversationId: msg.conversationId.toString(),
+        messageId: msg._id.toString(),
+        reactorUserId: userId,
+        isSecret: true,
+      });
+    }
+
+    return this.formatMessageSummary(msg, userId);
+  }
+
+  async revealSecretReaction(messageId: string, userId: string): Promise<MessageSummary> {
+    const msg = await Message.findById(messageId).populate('senderId', 'username displayName avatarUrl isVerified');
+    if (!msg || msg.isDeleted) throw new Error('Message not found');
+
+    const msgSenderId = (msg.senderId as any)?._id?.toString() || msg.senderId.toString();
+    const conv = await Conversation.findOne({ _id: msg.conversationId, participants: userId });
+    if (!conv) throw new Error('Access denied: Not a participant');
+
+    if (msgSenderId !== userId && conv.type !== 'direct') {
+      throw new Error('Only the message author can unlock secret reactions in a group chat');
+    }
+
+    const userObjId = new mongoose.Types.ObjectId(userId);
+    for (const sr of msg.secretReactions || []) {
+      if (!sr.revealedToUserIds.some((id) => id.toString() === userId)) {
+        sr.revealedToUserIds.push(userObjId);
+      }
+    }
+    await msg.save();
+
+    return this.formatMessageSummary(msg, userId);
+  }
+
+  async getScheduledMessages(conversationId: string, userId: string): Promise<MessageSummary[]> {
+    const conv = await Conversation.exists({ _id: conversationId, participants: userId });
+    if (!conv) throw new Error('Access denied: You are not a participant in this conversation');
+
+    const docs = await Message.find({
+      conversationId,
+      senderId: userId,
+      isScheduled: true,
+      scheduleStatus: 'pending',
+    })
+      .populate('senderId', 'username displayName avatarUrl isVerified')
+      .sort({ scheduledFor: 1 });
+
+    return docs.map((d) => this.formatMessageSummary(d, userId));
+  }
+
+  async cancelScheduledMessage(messageId: string, userId: string): Promise<void> {
+    const msg = await Message.findOne({
+      _id: messageId,
+      senderId: userId,
+      isScheduled: true,
+      scheduleStatus: 'pending',
+    });
+    if (!msg) throw new Error('Pending scheduled message not found');
+
+    msg.scheduleStatus = 'cancelled';
+    await msg.save();
+  }
+
+  async translateMessage(
+    messageId: string,
+    userId: string,
+    targetLang = 'en'
+  ): Promise<{
+    messageId: string;
+    translatedText: string;
+    targetLang: string;
+    detectedSourceLang: string;
+    provider: string;
+    note?: string;
+  }> {
+    const msg = await Message.findById(messageId);
+    if (!msg || msg.isDeleted) throw new Error('Message not found');
+
+    const isMember = await Conversation.exists({ _id: msg.conversationId, participants: userId });
+    if (!isMember) throw new Error('Access denied');
+
+    const result = await translationService.translateText(msg.content || '', targetLang);
+    msg.translations = {
+      ...(msg.translations || {}),
+      [result.targetLang]: result.translatedText,
+    };
+    msg.markModified('translations');
+    await msg.save();
+
+    return {
+      messageId: msg._id.toString(),
+      ...result,
+    };
+  }
+
+  async transcribeVoiceMessage(
+    messageId: string,
+    userId: string
+  ): Promise<{
+    messageId: string;
+    status: 'available' | 'unconfigured';
+    text: string;
+    note?: string;
+  }> {
+    const msg = await Message.findById(messageId);
+    if (!msg || msg.isDeleted) throw new Error('Message not found');
+
+    const isMember = await Conversation.exists({ _id: msg.conversationId, participants: userId });
+    if (!isMember) throw new Error('Access denied');
+
+    // Never fabricate a transcript when no Speech-to-Text engine is configured
+    const sttEndpoint = process.env.STT_API_URL;
+    if (!sttEndpoint) {
+      const result = {
+        status: 'unconfigured' as const,
+        text: '',
+        note: 'External Speech-to-Text engine is not configured (set STT_API_URL to enable automatic voice transcription).',
+      };
+      msg.voiceTranscript = result;
+      await msg.save();
+      return { messageId: msg._id.toString(), ...result };
+    }
+
+    const audioAttachment = (msg.attachments || []).find((a) => a.type === 'audio');
+    if (!audioAttachment) {
+      throw new Error('Message does not contain an audio attachment');
+    }
+
+    const response = await fetch(`${sttEndpoint.replace(/\/$/, '')}/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audioUrl: audioAttachment.url }),
+    });
+    if (!response.ok) {
+      throw new Error(`Speech-to-Text service returned ${response.status}`);
+    }
+    const payload = (await response.json()) as { text?: string };
+    const result = {
+      status: 'available' as const,
+      text: payload.text || '',
+    };
+    msg.voiceTranscript = result;
+    await msg.save();
+    return { messageId: msg._id.toString(), ...result };
+  }
+
+  async deliverDueScheduledMessages(now = new Date()): Promise<number> {
+    const dueMessages = await Message.find({
+      isScheduled: true,
+      scheduleStatus: 'pending',
+      scheduledFor: { $lte: now },
+      isDeleted: false,
+    })
+      .populate('senderId', 'username displayName avatarUrl isVerified')
+      .limit(100);
+
+    if (dueMessages.length === 0) return 0;
+
+    let delivered = 0;
+    const io = getIO();
+
+    for (const msg of dueMessages) {
+      try {
+        await Message.updateOne(
+          { _id: msg._id },
+          {
+            $set: {
+              isScheduled: false,
+              scheduleStatus: 'delivered',
+              createdAt: now,
+              updatedAt: now,
+            },
+          }
+        );
+        msg.isScheduled = false;
+        msg.scheduleStatus = 'delivered';
+        msg.createdAt = now;
+        msg.updatedAt = now;
+
+        const conv = await Conversation.findById(msg.conversationId);
+        if (conv) {
+          conv.lastMessage = {
+            id: msg._id,
+            senderId: msg.senderId._id ? msg.senderId._id : msg.senderId,
+            content: this.buildPreviewLabel(
+              msg.contentType,
+              msg.content,
+              msg.viewOnce,
+              msg.interactiveData
+            ),
+            contentType: msg.contentType,
+            createdAt: now,
+          };
+          await conv.save();
+          const senderIdStr = (msg.senderId as any)?._id?.toString() || msg.senderId.toString();
+          await streakService.recordDirectInteraction(senderIdStr, conv, now);
+        }
+
+        const senderIdStr = (msg.senderId as any)?._id?.toString() || msg.senderId.toString();
+        const summary = this.formatMessageSummary(msg, senderIdStr);
+        if (io) {
+          io.to(`conversation:${msg.conversationId}`).emit(SOCKET_EVENTS.NEW_MESSAGE, summary);
+        }
+        delivered++;
+      } catch (err) {
+        logger.error(`Error delivering scheduled message ${msg._id}`, 'ChatService', err);
+      }
+    }
+
+    return delivered;
+  }
+
+  async triggerDueReminders(now = new Date()): Promise<number> {
+    const dueReminders = await MessageReminder.find({
+      status: 'pending',
+      remindAt: { $lte: now },
+    }).limit(100);
+
+    if (dueReminders.length === 0) return 0;
+
+    let count = 0;
+    const io = getIO();
+
+    for (const reminder of dueReminders) {
+      try {
+        reminder.status = 'triggered';
+        await reminder.save();
+
+        await Notification.create({
+          recipientId: reminder.userId,
+          actorId: reminder.userId,
+          type: 'message',
+          title: 'Message Reminder',
+          body: reminder.note || reminder.messagePreview || 'Reminder for saved message',
+          data: {
+            conversationId: reminder.conversationId.toString(),
+            messageId: reminder.messageId.toString(),
+            reminderId: reminder._id.toString(),
+          },
+        });
+
+        if (io) {
+          io.to(`user:${reminder.userId}`).emit(SOCKET_EVENTS.REMINDER_TRIGGERED, {
+            id: reminder._id.toString(),
+            messageId: reminder.messageId.toString(),
+            conversationId: reminder.conversationId.toString(),
+            note: reminder.note,
+            messagePreview: reminder.messagePreview,
+            remindAt: reminder.remindAt.toISOString(),
+          });
+        }
+        count++;
+      } catch (err) {
+        logger.error(`Error triggering reminder ${reminder._id}`, 'ChatService', err);
+      }
+    }
+
     return count;
   }
 }

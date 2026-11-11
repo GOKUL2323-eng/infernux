@@ -346,6 +346,30 @@ export default function SettingsScreen() {
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
+          <TouchableOpacity style={styles.navRow} onPress={() => router.push('/settings/security' as any)}>
+            <View style={styles.rowLeft}>
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primaryLight} />
+              <Text style={[typography.body1, { color: colors.text, marginLeft: spacing.sm }]}>
+                Security & Privacy Center
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          <TouchableOpacity style={styles.navRow} onPress={() => router.push('/admin' as any)}>
+            <View style={styles.rowLeft}>
+              <Ionicons name="flag-outline" size={22} color={colors.primary} />
+              <Text style={[typography.body1, { color: colors.text, marginLeft: spacing.sm }]}>
+                Moderation & Appeals
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
           <TouchableOpacity style={styles.navRow} onPress={openBlockedUsersModal}>
             <View style={styles.rowLeft}>
               <Ionicons name="hand-left-outline" size={22} color={colors.error} />

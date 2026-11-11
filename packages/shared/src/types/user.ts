@@ -17,6 +17,32 @@ export interface NotificationPreferences {
   stories: boolean;
 }
 
+export type PresenceStatusMode =
+  | 'online'
+  | 'focus'
+  | 'gaming'
+  | 'listening'
+  | 'away'
+  | 'busy'
+  | 'dnd';
+
+export type AccountRole = 'user' | 'moderator' | 'admin';
+
+export interface ProfilePromptItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface GuestbookEntry {
+  id: string;
+  authorId: string;
+  authorUsername: string;
+  emoji: string;
+  note: string;
+  createdAt: string;
+}
+
 export interface UserSummary {
   id: string;
   username: string;
@@ -25,6 +51,8 @@ export interface UserSummary {
   isVerified?: boolean;
   isOnline?: boolean;
   lastSeen?: string;
+  statusMode?: PresenceStatusMode;
+  customStatusText?: string;
 }
 
 export interface UserProfile extends UserSummary {
@@ -37,6 +65,14 @@ export interface UserProfile extends UserSummary {
   authenticationProvider?: 'local' | 'phone' | 'google';
   bio?: string;
   coverImageUrl?: string;
+  role?: AccountRole;
+  isSuspended?: boolean;
+  suspendedReason?: string;
+  focusModeUntil?: string;
+  profileThemeAccent?: string;
+  featuredSongTitle?: string;
+  profilePrompts?: ProfilePromptItem[];
+  guestbookEntries?: GuestbookEntry[];
   followersCount: number;
   followingCount: number;
   postsCount: number;

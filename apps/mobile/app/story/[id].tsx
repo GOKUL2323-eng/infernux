@@ -22,7 +22,7 @@ import { Avatar } from '../../src/components/Avatar';
 import { api } from '../../src/api/client';
 import { sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, typography } from '../../src/theme/spacing';
-import { StoryItem } from '@infernux/shared';
+import { StoryItem, StorySticker } from '@infernux/shared';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,11 +35,17 @@ export default function StoryViewerScreen() {
   const { colors } = useThemeStore();
 
   const userGroup = stories.find((g) => g.user.id === id);
-  const storyItems = userGroup ? userGroup.stories : [];
+  const [storyItems, setStoryItems] = useState<StoryItem[]>(userGroup ? userGroup.stories : []);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [replyText, setReplyText] = useState('');
+  const [qboxAnswer, setQboxAnswer] = useState('');
+  const [qboxAnon, setQboxAnon] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (userGroup?.stories) setStoryItems(userGroup.stories);
+  }, [id, stories.length]);
 
   const currentStory: StoryItem | undefined = storyItems[currentIndex];
 
@@ -99,7 +105,11 @@ export default function StoryViewerScreen() {
   };
 
   const handleQuickReaction = async (emoji: string) => {
-    if (!userGroup) return;
+    if (!currentStory || !userGroup) return;
+    const reactRes = await api.post<StoryItem>(`/stories/${currentStory.id}/react`, { emoji });
+    if (reactRes.success && reactRes.data) {
+      setStoryItems((prev) => prev.map((s) => (s.id === currentStory.id ? reactRes.data! : s)));
+    }
     const res = await api.post('/chats/conversations', {
       type: 'direct',
       recipientId: userGroup.user.id,
@@ -111,6 +121,45 @@ export default function StoryViewerScreen() {
         contentType: 'text',
       });
       Alert.alert('Reaction Sent', `Sent ${emoji} to @${userGroup.user.username}`);
+    }
+  };
+
+  const handleStickerVote = async (sticker: StorySticker, optionId: string) => {
+    if (!currentStory) return;
+    const res = await api.post<StoryItem>(
+      `/stories/${currentStory.id}/stickers/${sticker.id}/interact`,
+      { optionId }
+    );
+    if (res.success && res.data) {
+      setStoryItems((prev) => prev.map((s) => (s.id === currentStory.id ? res.data! : s)));
+    }
+  };
+
+  const handleQuestionAnswer = async (sticker: StorySticker) => {
+    if (!currentStory || !qboxAnswer.trim()) return;
+    const res = await api.post<StoryItem>(
+      `/stories/${currentStory.id}/stickers/${sticker.id}/interact`,
+      { answerText: qboxAnswer.trim(), isAnonymous: qboxAnon }
+    );
+    if (res.success && res.data) {
+      setStoryItems((prev) => prev.map((s) => (s.id === currentStory.id ? res.data! : s)));
+      setQboxAnswer('');
+      Alert.alert('Submitted', qboxAnon ? 'Anonymous response sent!' : 'Response sent!');
+    }
+  };
+
+  const handleSaveToHighlight = async () => {
+    if (!currentStory) return;
+    const title = currentStory.caption?.slice(0, 20) || 'Highlights';
+    const res = await api.post('/stories/highlights', {
+      title,
+      coverUrl: currentStory.mediaUrl,
+      storyIds: [currentStory.id],
+    });
+    if (res.success) {
+      Alert.alert('Highlight Saved', `Saved to "${title}" on your profile.`);
+    } else {
+      Alert.alert('Error', res.error?.message || 'Could not save highlight');
     }
   };
 
@@ -201,6 +250,17 @@ export default function StoryViewerScreen() {
         </View>
 
         <View style={styles.headerRight}>
+          {currentStory.audience === 'close_friends' && (
+            <View style={styles.audiencePill}>
+              <Ionicons name="star" size={12} color="#22C55E" />
+              <Text style={styles.audiencePillText}>Close Friends</Text>
+            </View>
+          )}
+          {currentStory.creatorId === user?.id && (
+            <TouchableOpacity onPress={handleSaveToHighlight} style={styles.deleteStoryBtn}>
+              <Ionicons name="bookmark-outline" size={21} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
           {currentStory.creatorId === user?.id && (
             <TouchableOpacity onPress={handleDeleteStory} style={styles.deleteStoryBtn}>
               <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
@@ -211,6 +271,99 @@ export default function StoryViewerScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* 3. Interactive Story Stickers */}
+      {currentStory.stickers && currentStory.stickers.length > 0 && (
+        <View style={styles.stickersStack}>
+          {currentStory.stickers.map((st) => {
+            if (st.kind === 'poll' && st.options) {
+              const totalVotes = st.options.reduce((acc, o) => acc + (o.voterIds?.length || 0), 0);
+              return (
+                <View key={st.id} style={[styles.stickerCard, { borderColor: colors.border }]}>
+                  <Text style={styles.stickerTitle}>{st.question || 'Poll'}</Text>
+                  {st.options.map((opt) => {
+                    const count = opt.voterIds?.length || 0;
+                    const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                    const voted = user?.id ? opt.voterIds?.includes(user.id) : false;
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        onPress={() => handleStickerVote(st, opt.id)}
+                        style={[
+                          styles.pollOptionBtn,
+                          voted && { borderColor: colors.primary, backgroundColor: 'rgba(160,32,240,0.35)' },
+                        ]}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>{opt.text}</Text>
+                        <Text style={{ color: '#F04BBE', fontWeight: '700', fontSize: 12 }}>
+                          {count} ({pct}%)
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            }
+
+            if (st.kind === 'question_box') {
+              return (
+                <View key={st.id} style={[styles.stickerCard, { borderColor: colors.border }]}>
+                  <Text style={styles.stickerTitle}>{st.prompt || 'Ask me anything'}</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                    <TextInput
+                      value={qboxAnswer}
+                      onFocus={() => setIsPaused(true)}
+                      onBlur={() => setIsPaused(false)}
+                      onChangeText={setQboxAnswer}
+                      placeholder={qboxAnon ? 'Reply anonymously...' : 'Type your reply...'}
+                      placeholderTextColor="rgba(255,255,255,0.55)"
+                      style={styles.qboxInput}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setQboxAnon((a) => !a)}
+                      style={[styles.qboxSendBtn, { backgroundColor: qboxAnon ? '#21152B' : '#3B2850' }]}
+                    >
+                      <Ionicons name={qboxAnon ? 'eye-off-outline' : 'person-outline'} size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleQuestionAnswer(st)}
+                      style={[styles.qboxSendBtn, { backgroundColor: colors.primary }]}
+                    >
+                      <Ionicons name="send" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                  {st.responses && st.responses.length > 0 && (
+                    <Text style={{ color: '#D4CAE3', fontSize: 11, marginTop: 6 }}>
+                      {st.responses.length} response(s) — Latest: "{st.responses[st.responses.length - 1].text}"
+                    </Text>
+                  )}
+                </View>
+              );
+            }
+
+            if (st.kind === 'music') {
+              return (
+                <View key={st.id} style={[styles.stickerCard, { borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                  <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                    {st.musicTitle || 'Music'} {st.musicArtist ? `• ${st.musicArtist}` : ''}
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View key={st.id} style={[styles.stickerCard, { borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                <Ionicons name="timer-outline" size={18} color={colors.primary} />
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                  {st.countdownTitle || 'Countdown'}{' '}
+                  {st.countdownTargetDate ? `• ${new Date(st.countdownTargetDate).toLocaleDateString()}` : ''}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* 3. Caption overlay if present */}
       {currentStory.caption ? (
@@ -416,5 +569,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 20,
     borderWidth: 1,
+  },
+  audiencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(21,16,29,0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+  },
+  audiencePillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  stickersStack: {
+    position: 'absolute',
+    top: 112,
+    left: spacing.md,
+    right: spacing.md,
+    gap: 10,
+    zIndex: 15,
+  },
+  stickerCard: {
+    backgroundColor: 'rgba(21, 16, 29, 0.88)',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+  },
+  stickerTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  pollOptionBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(33, 21, 43, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 6,
+  },
+  qboxInput: {
+    flex: 1,
+    backgroundColor: '#08060D',
+    color: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 13,
+  },
+  qboxSendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

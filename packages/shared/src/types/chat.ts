@@ -56,6 +56,11 @@ export interface ConversationSummary {
   unreadCount: number;
   isMuted: boolean;
   isPinned: boolean;
+  isPriority?: boolean;
+  isArchived?: boolean;
+  folderIds?: string[];
+  draftContent?: string;
+  streak?: FriendStreakSummary;
   updatedAt: string;
   roomId?: string;
 }
@@ -69,7 +74,140 @@ export type MessageContentType =
   | 'shared_post'
   | 'shared_reel'
   | 'music_reference'
-  | 'call_event';
+  | 'call_event'
+  | 'poll'
+  | 'quiz'
+  | 'voting_card'
+  | 'event'
+  | 'checklist'
+  | 'location'
+  | 'contact'
+  | 'task';
+
+export type InteractiveCardKind =
+  | 'poll'
+  | 'quiz'
+  | 'voting_card'
+  | 'event'
+  | 'checklist'
+  | 'location'
+  | 'contact'
+  | 'task';
+
+export interface InteractivePollOption {
+  id: string;
+  text: string;
+  voterIds: string[];
+  isCorrect?: boolean;
+}
+
+export interface InteractiveChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  completedBy?: string;
+  assigneeId?: string;
+}
+
+export interface InteractiveEventData {
+  title: string;
+  description?: string;
+  startsAt: string;
+  location?: string;
+  rsvpGoingIds: string[];
+  rsvpMaybeIds: string[];
+  rsvpDeclinedIds: string[];
+}
+
+export interface InteractiveLocationData {
+  label: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  liveUntil?: string;
+}
+
+export interface InteractiveContactData {
+  userId?: string;
+  displayName: string;
+  username?: string;
+  phone?: string;
+}
+
+export interface InteractiveTaskData {
+  title: string;
+  assigneeId: string;
+  assigneeDisplayName?: string;
+  dueAt?: string;
+  status: 'todo' | 'in_progress' | 'done';
+}
+
+export interface InteractiveMessageData {
+  kind: InteractiveCardKind;
+  question?: string;
+  allowMultiple?: boolean;
+  explanation?: string;
+  options?: InteractivePollOption[];
+  checklistItems?: InteractiveChecklistItem[];
+  event?: InteractiveEventData;
+  location?: InteractiveLocationData;
+  contact?: InteractiveContactData;
+  task?: InteractiveTaskData;
+}
+
+export interface SecretReactionSummary {
+  userId: string;
+  emoji: string;
+  isRevealed: boolean;
+  createdAt: string;
+}
+
+export interface ChatFolderSummary {
+  id: string;
+  name: string;
+  color?: string;
+  icon?: string;
+  conversationIds: string[];
+  order: number;
+  createdAt: string;
+}
+
+export interface MessageReminderSummary {
+  id: string;
+  userId: string;
+  messageId: string;
+  conversationId: string;
+  remindAt: string;
+  note?: string;
+  status: 'pending' | 'triggered' | 'dismissed';
+  messagePreview?: string;
+  createdAt: string;
+}
+
+export interface SavedMessageCollectionItem {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  collectionName: string;
+  note?: string;
+  isImportant: boolean;
+  message?: MessageSummary;
+  createdAt: string;
+}
+
+export interface FriendStreakSummary {
+  id: string;
+  partnerId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastInteractionDate?: string;
+  status: 'active' | 'at_risk' | 'broken';
+  remindersEnabled: boolean;
+  privacyHidden: boolean;
+  recoveriesUsedThisMonth: number;
+  maxRecoveriesPerMonth: number;
+  lastRecoveredAt?: string;
+}
 
 export interface MessageReaction {
   userId: string;
@@ -114,6 +252,26 @@ export interface MessageSummary {
   isEdited: boolean;
   isDeleted: boolean;
   isPinned: boolean;
+  pinnedAt?: string;
+  pinnedBy?: string;
+  isScheduled?: boolean;
+  scheduledFor?: string;
+  scheduleStatus?: 'pending' | 'delivered' | 'cancelled';
+  forwardedFrom?: {
+    messageId: string;
+    senderDisplayName: string;
+    conversationId?: string;
+  };
+  secretReactions?: SecretReactionSummary[];
+  interactiveData?: InteractiveMessageData;
+  translations?: Record<string, string>;
+  voiceTranscript?: {
+    text: string;
+    status: 'available' | 'unconfigured';
+    note?: string;
+  };
+  isSavedByMe?: boolean;
+  isImportant?: boolean;
   expiresAt?: string;
   disappearingMode?: DisappearingMode;
   viewOnce?: boolean;

@@ -1,5 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { MessageContentType, MediaAttachment, DisappearingMode, MediaSavePolicy } from '@infernux/shared';
+import {
+  MessageContentType,
+  MediaAttachment,
+  DisappearingMode,
+  MediaSavePolicy,
+  InteractiveMessageData,
+} from '@infernux/shared';
 
 export interface IMessageDocument extends Document {
   conversationId: mongoose.Types.ObjectId;
@@ -13,11 +19,29 @@ export interface IMessageDocument extends Document {
     content: string;
     contentType: MessageContentType;
   };
+  forwardedFrom?: {
+    messageId: mongoose.Types.ObjectId;
+    senderDisplayName: string;
+    conversationId?: mongoose.Types.ObjectId;
+  };
   reactions: Array<{
     userId: mongoose.Types.ObjectId;
     emoji: string;
     createdAt: Date;
   }>;
+  secretReactions: Array<{
+    userId: mongoose.Types.ObjectId;
+    emoji: string;
+    revealedToUserIds: mongoose.Types.ObjectId[];
+    createdAt: Date;
+  }>;
+  interactiveData?: InteractiveMessageData;
+  translations?: Record<string, string>;
+  voiceTranscript?: {
+    text: string;
+    status: 'available' | 'unconfigured';
+    note?: string;
+  };
   receipts: Array<{
     userId: mongoose.Types.ObjectId;
     status: 'sent' | 'delivered' | 'read';
@@ -26,6 +50,11 @@ export interface IMessageDocument extends Document {
   isEdited: boolean;
   isDeleted: boolean;
   isPinned: boolean;
+  pinnedAt?: Date;
+  pinnedBy?: mongoose.Types.ObjectId;
+  isScheduled: boolean;
+  scheduledFor?: Date;
+  scheduleStatus?: 'pending' | 'delivered' | 'cancelled';
   expiresAt?: Date;
   disappearingMode?: DisappearingMode;
   viewOnce: boolean;
@@ -91,6 +120,14 @@ const MessageSchema = new Schema<IMessageDocument>(
         'shared_reel',
         'music_reference',
         'call_event',
+        'poll',
+        'quiz',
+        'voting_card',
+        'event',
+        'checklist',
+        'location',
+        'contact',
+        'task',
       ],
       default: 'text',
     },
@@ -105,6 +142,11 @@ const MessageSchema = new Schema<IMessageDocument>(
       content: { type: String },
       contentType: { type: String },
     },
+    forwardedFrom: {
+      messageId: { type: Schema.Types.ObjectId, ref: 'Message' },
+      senderDisplayName: { type: String },
+      conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation' },
+    },
     reactions: [
       {
         userId: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -112,6 +154,21 @@ const MessageSchema = new Schema<IMessageDocument>(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    secretReactions: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        emoji: { type: String },
+        revealedToUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    interactiveData: { type: Schema.Types.Mixed },
+    translations: { type: Schema.Types.Mixed },
+    voiceTranscript: {
+      text: { type: String },
+      status: { type: String, enum: ['available', 'unconfigured'] },
+      note: { type: String },
+    },
     receipts: [
       {
         userId: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -122,6 +179,11 @@ const MessageSchema = new Schema<IMessageDocument>(
     isEdited: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
     isPinned: { type: Boolean, default: false },
+    pinnedAt: { type: Date },
+    pinnedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    isScheduled: { type: Boolean, default: false, index: true },
+    scheduledFor: { type: Date, index: true },
+    scheduleStatus: { type: String, enum: ['pending', 'delivered', 'cancelled'] },
     expiresAt: { type: Date, index: true },
     disappearingMode: { type: String, enum: ['off', 'after_view', '24h', '7d'] },
     viewOnce: { type: Boolean, default: false },
@@ -156,6 +218,8 @@ const MessageSchema = new Schema<IMessageDocument>(
 
 // High-speed index for cursor-based message pagination within a conversation
 MessageSchema.index({ conversationId: 1, createdAt: -1 });
+MessageSchema.index({ conversationId: 1, isPinned: 1 });
+MessageSchema.index({ scheduleStatus: 1, scheduledFor: 1 });
 
 export const Message = mongoose.model<IMessageDocument>('Message', MessageSchema);
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { reelController } from '../controllers/reel.controller';
 import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 import { validateBody } from '../middlewares/validate.middleware';
-import { createReelSchema, addReelCommentSchema } from '@infernux/shared';
+import { createReelSchema, addReelCommentSchema, respondCollabSchema } from '@infernux/shared';
 
 const router = Router();
 
@@ -29,6 +29,9 @@ router.get('/:id/comments', optionalAuthenticate, (req, res, next) =>
 );
 router.post('/:id/comments', authenticate, validateBody(addReelCommentSchema), (req, res, next) =>
   reelController.addComment(req, res, next)
+);
+router.post('/:id/collab/respond', authenticate, validateBody(respondCollabSchema), (req, res, next) =>
+  reelController.respondCollab(req, res, next)
 );
 router.get('/user/:userId', optionalAuthenticate, (req, res, next) =>
   reelController.getUserReels(req, res, next)

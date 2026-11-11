@@ -87,6 +87,19 @@ export class PostController {
       next(error);
     }
   }
+
+  async respondCollab(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await postService.respondCollabInvite(
+        req.userId!,
+        getParam(req.params.id),
+        Boolean(req.body.accept)
+      );
+      sendSuccess(res, result, result.accepted ? 'Collaboration accepted' : 'Collaboration declined');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const postController = new PostController();

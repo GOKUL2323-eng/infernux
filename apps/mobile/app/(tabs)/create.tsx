@@ -21,9 +21,11 @@ import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { uploadMediaAsset, sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
+import { AiContentAssistResponse } from '@infernux/shared';
 
 type CreateType = 'post' | 'reel' | 'story' | 'note';
-type Audience = 'all' | 'followers' | 'close_friends';
+type Audience = 'all' | 'followers' | 'close_friends' | 'custom';
+type StoryStickerType = 'none' | 'poll' | 'question_box' | 'music' | 'countdown';
 
 export default function CreateScreen() {
   const router = useRouter();
@@ -41,9 +43,38 @@ export default function CreateScreen() {
   const [selectedMedia, setSelectedMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [caption, setCaption] = useState('');
   const [audience, setAudience] = useState<Audience>('all');
+  const [storyStickerType, setStoryStickerType] = useState<StoryStickerType>('none');
+  const [stickerPrompt, setStickerPrompt] = useState('');
+  const [pollOptionA, setPollOptionA] = useState('Yes');
+  const [pollOptionB, setPollOptionB] = useState('No');
   const [socialNoteEmoji, setSocialNoteEmoji] = useState('🔥');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [showAiAssist, setShowAiAssist] = useState(false);
+  const [aiTone, setAiTone] = useState<'casual' | 'professional' | 'hype' | 'minimal'>('casual');
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiContentAssistResponse | null>(null);
+
+  const handleGenerateAiAssist = async () => {
+    const topicText = aiTopic.trim() || caption.trim();
+    if (!topicText) {
+      Alert.alert('Topic Required', 'Enter a short topic or caption draft first.');
+      return;
+    }
+    try {
+      setAiLoading(true);
+      const res = await api.post<AiContentAssistResponse>('/ai/content-assist', {
+        topic: topicText,
+        tone: aiTone,
+      });
+      setAiResult(res.data || null);
+    } catch (error: any) {
+      Alert.alert('AI Assist Error', error.message || 'Unable to generate suggestions');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const pickMedia = async (mediaTypes: ImagePicker.MediaTypeOptions = ImagePicker.MediaTypeOptions.Images) => {
     try {
@@ -104,11 +135,54 @@ export default function CreateScreen() {
           });
         }
 
+        const stickers =
+          storyStickerType === 'poll'
+            ? [
+                {
+                  id: `poll_${Date.now()}`,
+                  kind: 'poll',
+                  question: stickerPrompt.trim() || 'Vote now!',
+                  options: [
+                    { id: 'opt_1', text: pollOptionA.trim() || 'Yes', voterIds: [] },
+                    { id: 'opt_2', text: pollOptionB.trim() || 'No', voterIds: [] },
+                  ],
+                },
+              ]
+            : storyStickerType === 'question_box'
+            ? [
+                {
+                  id: `qbox_${Date.now()}`,
+                  kind: 'question_box',
+                  prompt: stickerPrompt.trim() || 'Ask me anything anonymously',
+                  allowAnonymous: true,
+                },
+              ]
+            : storyStickerType === 'music'
+            ? [
+                {
+                  id: `music_${Date.now()}`,
+                  kind: 'music',
+                  musicTitle: stickerPrompt.trim() || 'Night Drive',
+                  musicArtist: 'MOZHI Audio',
+                },
+              ]
+            : storyStickerType === 'countdown'
+            ? [
+                {
+                  id: `cd_${Date.now()}`,
+                  kind: 'countdown',
+                  countdownTitle: stickerPrompt.trim() || 'Big Drop Soon',
+                  countdownTargetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+                },
+              ]
+            : undefined;
+
         const res = await api.post('/stories', {
           mediaType: selectedMedia?.type === 'video' ? 'video' : 'image',
           mediaUrl,
           caption: caption.trim() || undefined,
           audience,
+          stickers,
           duration: 5,
         });
 
@@ -379,6 +453,174 @@ export default function CreateScreen() {
                   <Text style={[typography.caption, { color: colors.primary }]}>{tag}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity
+                onPress={() => setShowAiAssist((v) => !v)}
+                style={[
+                  styles.hashtagChip,
+                  {
+                    backgroundColor: showAiAssist ? colors.primary : 'rgba(160,32,240,0.16)',
+                    borderColor: colors.primary,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  },
+                ]}
+              >
+                <Ionicons name="sparkles" size={12} color={showAiAssist ? '#FFFFFF' : colors.primaryLight} />
+                <Text style={[typography.caption, { color: showAiAssist ? '#FFFFFF' : colors.primaryLight, fontWeight: '700' }]}>
+                  AI Studio Assist
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* AI Content Assist Drawer */}
+          {showAiAssist && activeType !== 'note' && (
+            <View
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.primary,
+                borderWidth: 1,
+                borderRadius: borderRadius.md,
+                padding: spacing.sm,
+                marginVertical: spacing.xs,
+              }}
+            >
+              <Text style={{ color: colors.primaryLight, fontWeight: '800', fontSize: 12.5, marginBottom: 6 }}>
+                MOZHI AI CAPTION & IDEA HELPER
+              </Text>
+              <Input
+                label="What is your post about?"
+                placeholder="e.g. Sunset acoustic session, coffee morning..."
+                value={aiTopic}
+                onChangeText={setAiTopic}
+              />
+              <View style={styles.hashtagRow}>
+                {(['casual', 'professional', 'hype', 'minimal'] as const).map((tone) => (
+                  <TouchableOpacity
+                    key={tone}
+                    onPress={() => setAiTone(tone)}
+                    style={[
+                      styles.hashtagChip,
+                      {
+                        backgroundColor: aiTone === tone ? colors.primary : colors.surface,
+                        borderColor: aiTone === tone ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: aiTone === tone ? '#FFFFFF' : colors.textSecondary,
+                        fontSize: 11.5,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {tone}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Button
+                title={aiLoading ? 'Generating...' : 'Suggest Captions & Tags'}
+                onPress={handleGenerateAiAssist}
+                disabled={aiLoading}
+              />
+              {aiResult && (
+                <View style={{ marginTop: spacing.sm, gap: 6 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '700' }}>
+                    Tap a caption to apply:
+                  </Text>
+                  {aiResult.captions.map((cap, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setCaption(cap)}
+                      style={{
+                        backgroundColor: colors.surface,
+                        padding: 8,
+                        borderRadius: borderRadius.sm,
+                        borderWidth: 0.5,
+                        borderColor: colors.border,
+                      }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 12.5 }}>{cap}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <View style={styles.hashtagRow}>
+                    {aiResult.hashtags.map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        onPress={() => addHashtag(tag)}
+                        style={[styles.hashtagChip, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      >
+                        <Text style={{ color: colors.primaryLight, fontSize: 11.5 }}>{tag}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={{ color: colors.textMuted, fontSize: 10.5 }}>
+                    {aiResult.disclaimer}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Story Interactive Stickers */}
+          {activeType === 'story' && (
+            <View style={{ marginTop: spacing.md }}>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: spacing.xs, fontWeight: '700' }]}>
+                INTERACTIVE STORY STICKER
+              </Text>
+              <View style={styles.hashtagRow}>
+                {[
+                  { id: 'none', label: 'None' },
+                  { id: 'poll', label: 'Poll' },
+                  { id: 'question_box', label: 'Q&A Box' },
+                  { id: 'music', label: 'Music' },
+                  { id: 'countdown', label: 'Countdown' },
+                ].map((s) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    onPress={() => setStoryStickerType(s.id as StoryStickerType)}
+                    style={[
+                      styles.hashtagChip,
+                      {
+                        backgroundColor: storyStickerType === s.id ? colors.primary : colors.surfaceElevated,
+                        borderColor: storyStickerType === s.id ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[typography.caption, { color: storyStickerType === s.id ? '#FFFFFF' : colors.textSecondary, fontWeight: '700' }]}>
+                      {s.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {storyStickerType !== 'none' && (
+                <Input
+                  label={
+                    storyStickerType === 'poll'
+                      ? 'Poll Question'
+                      : storyStickerType === 'music'
+                      ? 'Track Title'
+                      : storyStickerType === 'countdown'
+                      ? 'Countdown Event Title'
+                      : 'Question Box Prompt'
+                  }
+                  placeholder="Enter sticker text..."
+                  value={stickerPrompt}
+                  onChangeText={setStickerPrompt}
+                />
+              )}
+              {storyStickerType === 'poll' && (
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Input label="Option A" value={pollOptionA} onChangeText={setPollOptionA} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Input label="Option B" value={pollOptionB} onChangeText={setPollOptionB} />
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -391,7 +633,7 @@ export default function CreateScreen() {
               {[
                 { id: 'all' as Audience, label: 'Public', icon: 'earth-outline' },
                 { id: 'followers' as Audience, label: 'Followers', icon: 'people-outline' },
-                { id: 'close_friends' as Audience, label: 'Private', icon: 'lock-closed-outline' },
+                { id: 'close_friends' as Audience, label: 'Close Friends', icon: 'star-outline' },
               ].map((opt) => (
                 <TouchableOpacity
                   key={opt.id}

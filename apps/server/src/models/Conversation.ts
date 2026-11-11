@@ -16,6 +16,8 @@ export interface IConversationDocument extends Document {
   };
   mutedBy: mongoose.Types.ObjectId[];
   pinnedBy: mongoose.Types.ObjectId[];
+  priorityBy: mongoose.Types.ObjectId[];
+  archivedBy: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +54,8 @@ const ConversationSchema = new Schema<IConversationDocument>(
     },
     mutedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     pinnedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    priorityBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    archivedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
   {
     timestamps: true,

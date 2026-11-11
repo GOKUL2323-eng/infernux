@@ -11,6 +11,11 @@ export interface IPostDocument extends Document {
   commentsCount: number;
   sharesCount: number;
   isPrivate: boolean;
+  collaboratorIds: mongoose.Types.ObjectId[];
+  collabInvites: Array<{
+    userId: mongoose.Types.ObjectId;
+    status: 'pending' | 'accepted' | 'declined';
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +59,13 @@ const PostSchema = new Schema<IPostDocument>(
     commentsCount: { type: Number, default: 0 },
     sharesCount: { type: Number, default: 0 },
     isPrivate: { type: Boolean, default: false },
+    collaboratorIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    collabInvites: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+      },
+    ],
   },
   {
     timestamps: true,

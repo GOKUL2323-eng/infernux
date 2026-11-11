@@ -19,21 +19,47 @@ import { useCallStore } from '../../src/store/useCallStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { Avatar } from '../../src/components/Avatar';
+import {
+  CreateFolderModal,
+  SavedAndRemindersModal,
+  ConversationOrgModal,
+} from '../../src/components/chat/ChatToolsModals';
 import { api } from '../../src/api/client';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
 import { ConversationSummary, CallSession } from '@infernux/shared';
 
 type ChatTab = 'direct' | 'rooms' | 'calls';
+type SmartFilter = 'all' | 'priority' | 'unread' | 'archived' | string;
 
 export default function ChatsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuthStore();
   const { colors } = useThemeStore();
-  const { conversations, loadConversations, isLoading } = useChatStore();
+  const {
+    conversations,
+    loadConversations,
+    isLoading,
+    folders,
+    loadFolders,
+    createFolder,
+    updateConversationPrefs,
+    savedMessages,
+    loadSavedMessages,
+    unsavePersonalMessage,
+    reminders,
+    loadReminders,
+    dismissReminder,
+    recoverStreak,
+    updateStreakSettings,
+  } = useChatStore();
   const { initiateCall } = useCallStore();
 
   const [activeTab, setActiveTab] = useState<ChatTab>('direct');
+  const [smartFilter, setSmartFilter] = useState<SmartFilter>('all');
+  const [folderModalVisible, setFolderModalVisible] = useState(false);
+  const [toolsModalMode, setToolsModalMode] = useState<'saved' | 'reminders' | null>(null);
+  const [orgConversation, setOrgConversation] = useState<ConversationSummary | null>(null);
   const [callHistory, setCallHistory] = useState<CallSession[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +67,9 @@ export default function ChatsScreen() {
   useEffect(() => {
     if (isAuthenticated) {
       loadConversations();
+      loadFolders();
+      loadSavedMessages();
+      loadReminders();
       fetchCallHistory();
     }
   }, [isAuthenticated, user?.id]);
@@ -54,13 +83,30 @@ export default function ChatsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadConversations(), fetchCallHistory()]);
+    await Promise.all([loadConversations(), loadFolders(), loadSavedMessages(), loadReminders(), fetchCallHistory()]);
     setRefreshing(false);
+  };
+
+  const applySmartFilter = (list: ConversationSummary[]) => {
+    return list
+      .filter((c) => {
+        if (smartFilter === 'archived') return Boolean(c.isArchived);
+        if (c.isArchived) return false;
+        if (smartFilter === 'priority') return Boolean(c.isPriority);
+        if (smartFilter === 'unread') return c.unreadCount > 0;
+        if (smartFilter !== 'all') return Boolean(c.folderIds?.includes(smartFilter));
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
   };
 
   // Filter conversations
   const directConversations = useMemo(() => {
-    return conversations
+    const matched = conversations
       .filter((c) => c.type === 'direct')
       .filter((c) => {
         if (!searchQuery.trim()) return true;
@@ -72,10 +118,11 @@ export default function ChatsScreen() {
         );
         return titleMatch || lastMsgMatch || userMatch;
       });
-  }, [conversations, searchQuery]);
+    return applySmartFilter(matched);
+  }, [conversations, searchQuery, smartFilter]);
 
   const roomConversations = useMemo(() => {
-    return conversations
+    const matched = conversations
       .filter((c) => c.type === 'room' || c.type === 'group')
       .filter((c) => {
         if (!searchQuery.trim()) return true;
@@ -84,7 +131,8 @@ export default function ChatsScreen() {
         const lastMsgMatch = c.lastMessage?.content?.toLowerCase().includes(q);
         return titleMatch || lastMsgMatch;
       });
-  }, [conversations, searchQuery]);
+    return applySmartFilter(matched);
+  }, [conversations, searchQuery, smartFilter]);
 
   const filteredCallHistory = useMemo(() => {
     return callHistory.filter((c) => {
@@ -177,6 +225,7 @@ export default function ChatsScreen() {
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => router.push(`/chat/${item.id}` as any)}
+        onLongPress={() => setOrgConversation(item)}
         style={[
           styles.chatRow,
           { borderBottomColor: colors.border },
@@ -209,8 +258,27 @@ export default function ChatsScreen() {
                 { color: colors.text, fontWeight: isUnread ? '700' : '600' },
               ]}
             >
+              {item.isPinned ? '📌 ' : ''}
+              {item.isPriority ? '★ ' : ''}
               {item.title || otherParticipant?.displayName || otherParticipant?.username || 'Conversation'}
             </Text>
+
+            {item.streak && item.streak.currentStreak > 0 && !item.streak.privacyHidden && (
+              <TouchableOpacity
+                onPress={() => setOrgConversation(item)}
+                style={{
+                  backgroundColor: 'rgba(240,75,190,0.18)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                  marginLeft: 4,
+                }}
+              >
+                <Text style={{ color: '#F04BBE', fontSize: 10.5, fontWeight: '800' }}>
+                  🔥 {item.streak.currentStreak}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {lastMsg && (
               <Text style={[styles.timeText, { color: isUnread ? colors.primary : colors.textMuted }]}>
@@ -225,12 +293,18 @@ export default function ChatsScreen() {
               style={[
                 styles.previewText,
                 {
-                  color: isUnread ? colors.text : colors.textSecondary,
-                  fontWeight: isUnread ? '700' : '400',
+                  color: item.draftContent
+                    ? '#F04BBE'
+                    : isUnread
+                    ? colors.text
+                    : colors.textSecondary,
+                  fontWeight: isUnread || item.draftContent ? '700' : '400',
                 },
               ]}
             >
-              {lastMsg
+              {item.draftContent
+                ? `Draft: ${item.draftContent}`
+                : lastMsg
                 ? lastMsg.senderId === user?.id
                   ? `You: ${lastMsg.content}`
                   : lastMsg.content
@@ -330,6 +404,30 @@ export default function ChatsScreen() {
         </View>
 
         <View style={styles.headerRight}>
+          {/* Personal Saved Messages */}
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            onPress={() => {
+              loadSavedMessages();
+              setToolsModalMode('saved');
+            }}
+          >
+            <Ionicons name="bookmark-outline" size={21} color={colors.primaryLight} />
+          </TouchableOpacity>
+
+          {/* Message Reminders */}
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            onPress={() => {
+              loadReminders();
+              setToolsModalMode('reminders');
+            }}
+          >
+            <Ionicons name="alarm-outline" size={21} color={colors.text} />
+          </TouchableOpacity>
+
           {/* Join via Key icon */}
           <TouchableOpacity
             style={styles.headerActionBtn}
@@ -412,6 +510,56 @@ export default function ChatsScreen() {
           </ScrollView>
         </View>
       )}
+
+      {/* Smart Organization Filter Bar & Folders */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ maxHeight: 38, marginBottom: 4 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.md, gap: 8, alignItems: 'center' }}
+      >
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'priority', label: '★ Priority' },
+          { key: 'unread', label: 'Unread' },
+          { key: 'archived', label: 'Archived' },
+          ...folders.map((f) => ({ key: f.id, label: `📁 ${f.name}` })),
+        ].map((pill) => {
+          const active = smartFilter === pill.key;
+          return (
+            <TouchableOpacity
+              key={pill.key}
+              onPress={() => setSmartFilter(pill.key)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: active ? colors.primary : colors.border,
+                backgroundColor: active ? 'rgba(160,32,240,0.25)' : colors.surfaceElevated,
+              }}
+            >
+              <Text style={{ color: active ? '#FFFFFF' : colors.textSecondary, fontSize: 12, fontWeight: '700' }}>
+                {pill.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        <TouchableOpacity
+          onPress={() => setFolderModalVisible(true)}
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: colors.primaryLight,
+          }}
+        >
+          <Text style={{ color: colors.primaryLight, fontSize: 12, fontWeight: '700' }}>+ Folder</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       {/* 4. Segmented Sub-Tabs (Direct, Rooms, Calls) */}
       <View style={[styles.tabsRow, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
@@ -563,6 +711,41 @@ export default function ChatsScreen() {
           }
         />
       )}
+
+      <CreateFolderModal
+        visible={folderModalVisible}
+        onClose={() => setFolderModalVisible(false)}
+        onCreate={(name) => createFolder(name, '#A020F0')}
+      />
+
+      <SavedAndRemindersModal
+        visible={Boolean(toolsModalMode)}
+        mode={toolsModalMode}
+        savedMessages={savedMessages}
+        reminders={reminders}
+        onClose={() => setToolsModalMode(null)}
+        onUnsave={(msgId) => unsavePersonalMessage(msgId)}
+        onDismissReminder={(remId) => dismissReminder(remId)}
+        onNavigateConversation={(convId) => router.push(`/chat/${convId}` as any)}
+      />
+
+      <ConversationOrgModal
+        conversation={orgConversation}
+        folders={folders}
+        streak={orgConversation?.streak}
+        onClose={() => setOrgConversation(null)}
+        onUpdatePrefs={async (convId, prefs) => {
+          await updateConversationPrefs(convId, prefs);
+          await loadConversations();
+          setOrgConversation(null);
+        }}
+        onRecoverStreak={async (streakId) => {
+          await recoverStreak(streakId);
+        }}
+        onToggleStreakSettings={async (streakId, settings) => {
+          await updateStreakSettings(streakId, settings);
+        }}
+      />
     </SafeAreaView>
   );
 }

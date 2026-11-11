@@ -105,6 +105,17 @@ export default function RootLayout() {
           <Stack.Screen name="search/index" options={{ headerShown: false }} />
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
           <Stack.Screen name="settings/index" options={{ headerShown: false }} />
+          <Stack.Screen name="snap/index" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/index" options={{ headerShown: false }} />
+          <Stack.Screen name="communities/index" options={{ headerShown: false }} />
+          <Stack.Screen name="communities/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="audio-rooms/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="files/index" options={{ headerShown: false }} />
+          <Stack.Screen name="capsules/index" options={{ headerShown: false }} />
+          <Stack.Screen name="moodspace/index" options={{ headerShown: false }} />
+          <Stack.Screen name="together/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="settings/security" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/index" options={{ headerShown: false }} />
         </Stack>
 
         {/* Global floating mini-player */}

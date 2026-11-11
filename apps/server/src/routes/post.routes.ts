@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { postController } from '../controllers/post.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validateBody } from '../middlewares/validate.middleware';
-import { createPostSchema, addCommentSchema } from '@infernux/shared';
+import { createPostSchema, addCommentSchema, respondCollabSchema } from '@infernux/shared';
 
 const router = Router();
 
@@ -19,6 +19,9 @@ router.post('/:id/comments', validateBody(addCommentSchema), (req, res, next) =>
 );
 router.post('/:id/save', (req, res, next) => postController.toggleSavePost(req, res, next));
 router.get('/user/:userId', (req, res, next) => postController.getUserPosts(req, res, next));
+router.post('/:id/collab/respond', validateBody(respondCollabSchema), (req, res, next) =>
+  postController.respondCollab(req, res, next)
+);
 router.delete('/:id', (req, res, next) => postController.deletePost(req, res, next));
 
 export default router;

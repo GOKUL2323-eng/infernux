@@ -89,23 +89,22 @@ export function initializeSocketIO(io: SocketIOServer): void {
       try {
         const message = await chatService.sendMessage(userId, payload);
 
-        // Broadcast to everyone in conversation room
-        io.to(`conversation:${payload.conversationId}`).emit(SOCKET_EVENTS.NEW_MESSAGE, message);
-
-        // Also push in-app notification to participants who might be outside the active conversation view
-        const conv = await Conversation.findById(payload.conversationId).select('participants type title');
-        if (conv) {
-          for (const pId of conv.participants) {
-            const recipientId = pId.toString();
-            if (recipientId !== userId) {
-              await notificationService.sendNotification(
-                recipientId,
-                userId,
-                'message',
-                message.sender.displayName || 'New Message',
-                payload.contentType === 'text' ? payload.content : `Sent an attachment [${payload.contentType}]`,
-                { conversationId: payload.conversationId }
-              );
+        // Push in-app notifications only when delivered immediately (not future-scheduled)
+        if (!message.isScheduled) {
+          const conv = await Conversation.findById(payload.conversationId).select('participants type title');
+          if (conv) {
+            for (const pId of conv.participants) {
+              const recipientId = pId.toString();
+              if (recipientId !== userId) {
+                await notificationService.sendNotification(
+                  recipientId,
+                  userId,
+                  'message',
+                  message.sender.displayName || 'New Message',
+                  payload.contentType === 'text' ? payload.content : `Sent an attachment [${payload.contentType}]`,
+                  { conversationId: payload.conversationId }
+                );
+              }
             }
           }
         }
@@ -193,6 +192,34 @@ export function initializeSocketIO(io: SocketIOServer): void {
       } catch (err) {
         logger.error('Error handling screenshot detection event', 'SocketIO', err);
       }
+    });
+
+    // --- LIVE AUDIO ROOM SOCKET ROOMS ---
+    socket.on(SOCKET_EVENTS.AUDIO_ROOM_JOIN, (roomId: string) => {
+      if (roomId) socket.join(`audio_room:${roomId}`);
+    });
+
+    socket.on(SOCKET_EVENTS.AUDIO_ROOM_LEAVE, (roomId: string) => {
+      if (roomId) socket.leave(`audio_room:${roomId}`);
+    });
+
+    socket.on(SOCKET_EVENTS.AUDIO_ROOM_REACTION, (data: { roomId: string; emoji: string }) => {
+      if (data?.roomId && data?.emoji) {
+        io.to(`audio_room:${data.roomId}`).emit(SOCKET_EVENTS.AUDIO_ROOM_REACTION, {
+          roomId: data.roomId,
+          userId,
+          emoji: data.emoji,
+        });
+      }
+    });
+
+    // --- TOGETHER MODE SOCKET ROOMS ---
+    socket.on(SOCKET_EVENTS.TOGETHER_JOIN, (sessionId: string) => {
+      if (sessionId) socket.join(`together:${sessionId}`);
+    });
+
+    socket.on(SOCKET_EVENTS.TOGETHER_LEAVE, (sessionId: string) => {
+      if (sessionId) socket.leave(`together:${sessionId}`);
     });
 
     // --- HEARTBEAT & DISCONNECT ---

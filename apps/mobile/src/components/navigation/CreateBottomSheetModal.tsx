@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Modal,
+  ScrollView,
   TouchableOpacity,
   TouchableWithoutFeedback,
   StyleSheet,
@@ -157,6 +158,38 @@ export const CreateBottomSheetModal: React.FC = () => {
       gradient: ['#F04BBE', '#FF6B6B'],
       onPress: () => router.push('/notes/social' as any),
     },
+    {
+      id: 'snap_moment',
+      title: 'Snap Moment',
+      subtitle: 'Disappearing camera photo/video with filters & timer',
+      icon: 'flash-outline',
+      gradient: ['#A020F0', '#F04BBE'],
+      onPress: () => router.push('/snap' as any),
+    },
+    {
+      id: 'creator_studio',
+      title: 'Creator Studio',
+      subtitle: 'Analytics, scheduled Reels & draft management',
+      icon: 'analytics-outline',
+      gradient: ['#7B0FBB', '#F04BBE'],
+      onPress: () => router.push('/creator' as any),
+    },
+    {
+      id: 'communities',
+      title: 'Spaces & Audio Rooms',
+      subtitle: 'Topic communities, live audio stage & shared files',
+      icon: 'planet-outline',
+      gradient: ['#8A2BE2', '#C026D3'],
+      onPress: () => router.push('/communities' as any),
+    },
+    {
+      id: 'moodspace',
+      title: 'MoodSpace & Capsules',
+      subtitle: 'Mood check-ins, Together mode & time capsules',
+      icon: 'happy-outline',
+      gradient: ['#A020F0', '#F04BBE'],
+      onPress: () => router.push('/moodspace' as any),
+    },
   ];
 
   if (!visible) return null;
@@ -210,7 +243,7 @@ export const CreateBottomSheetModal: React.FC = () => {
           </View>
 
           {/* Options List */}
-          <View style={styles.optionsList}>
+          <ScrollView style={[styles.optionsList, { maxHeight: SCREEN_HEIGHT * 0.7 }]} showsVerticalScrollIndicator={false}>
             {createOptions.map((opt, idx) => (
               <React.Fragment key={opt.id}>
                 {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
@@ -244,7 +277,7 @@ export const CreateBottomSheetModal: React.FC = () => {
                 </TouchableOpacity>
               </React.Fragment>
             ))}
-          </View>
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>

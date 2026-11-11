@@ -28,6 +28,13 @@ export interface PostSummary {
   isLiked: boolean;
   isSaved: boolean;
   isPrivate: boolean;
+  collaborators?: UserSummary[];
+  collabInvites?: Array<{
+    userId: string;
+    username?: string;
+    displayName?: string;
+    status: 'pending' | 'accepted' | 'declined';
+  }>;
   createdAt: string;
   updatedAt: string;
 }

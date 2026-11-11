@@ -1,5 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { ReelAudioAttribution } from '@infernux/shared';
+import {
+  ReelAudioAttribution,
+  ReelClipSegment,
+  ReelTextOverlay,
+} from '@infernux/shared';
 
 export interface IReelDocument extends Document {
   creatorId: mongoose.Types.ObjectId;
@@ -9,6 +13,22 @@ export interface IReelDocument extends Document {
   hashtags: string[];
   audio?: ReelAudioAttribution;
   duration: number;
+  trimStartSec?: number;
+  trimEndSec?: number;
+  playbackSpeed?: number;
+  clips?: ReelClipSegment[];
+  voiceoverUrl?: string;
+  musicVolume?: number;
+  voiceoverVolume?: number;
+  textOverlays?: ReelTextOverlay[];
+  coverTimeSec?: number;
+  status: 'draft' | 'scheduled' | 'published';
+  scheduledFor?: Date;
+  collaboratorIds: mongoose.Types.ObjectId[];
+  collabInvites: Array<{
+    userId: mongoose.Types.ObjectId;
+    status: 'pending' | 'accepted' | 'declined';
+  }>;
   viewsCount: number;
   likesCount: number;
   commentsCount: number;
@@ -50,6 +70,29 @@ const ReelSchema = new Schema<IReelDocument>(
       required: true,
       max: 90,
     },
+    trimStartSec: { type: Number, default: 0 },
+    trimEndSec: { type: Number },
+    playbackSpeed: { type: Number, default: 1 },
+    clips: { type: Schema.Types.Mixed, default: [] },
+    voiceoverUrl: { type: String },
+    musicVolume: { type: Number, default: 1 },
+    voiceoverVolume: { type: Number, default: 1 },
+    textOverlays: { type: Schema.Types.Mixed, default: [] },
+    coverTimeSec: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ['draft', 'scheduled', 'published'],
+      default: 'published',
+      index: true,
+    },
+    scheduledFor: { type: Date, index: true },
+    collaboratorIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    collabInvites: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+      },
+    ],
     viewsCount: { type: Number, default: 0 },
     likesCount: { type: Number, default: 0 },
     commentsCount: { type: Number, default: 0 },

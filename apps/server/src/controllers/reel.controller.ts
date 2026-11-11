@@ -103,6 +103,16 @@ export class ReelController {
       next(error);
     }
   }
+
+  async respondCollab(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req.params.id);
+      const result = await reelService.respondCollabInvite(req.userId!, id, req.body.accept);
+      sendSuccess(res, result, req.body.accept ? 'Collab accepted' : 'Collab declined');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const reelController = new ReelController();

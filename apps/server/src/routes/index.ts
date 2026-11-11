@@ -12,6 +12,13 @@ import noteRoutes from './note.routes';
 import notificationRoutes from './notification.routes';
 import mediaRoutes from './media.routes';
 import moderationRoutes from './moderation.routes';
+import snapRoutes from './snap.routes';
+import creatorRoutes from './creator.routes';
+import communityRoutes from './community.routes';
+import audioRoomRoutes from './audio-room.routes';
+import experienceRoutes from './experience.routes';
+import aiRoutes from './ai.routes';
+import securityRoutes from './security.routes';
 
 const router = Router();
 
@@ -28,6 +35,13 @@ router.use('/notes', noteRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/media', mediaRoutes);
 router.use('/moderation', moderationRoutes);
+router.use('/snaps', snapRoutes);
+router.use('/creator', creatorRoutes);
+router.use('/communities', communityRoutes);
+router.use('/audio-rooms', audioRoomRoutes);
+router.use('/experiences', experienceRoutes);
+router.use('/ai', aiRoutes);
+router.use('/security', securityRoutes);
 
 export default router;
 

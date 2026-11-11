@@ -7,6 +7,11 @@ export const createPostSchema = z.object({
   hashtags: z.array(z.string()).optional(),
   mentions: z.array(z.string()).optional(),
   isPrivate: z.boolean().default(false),
+  collaboratorIds: z.array(z.string()).max(10).optional(),
+});
+
+export const respondCollabSchema = z.object({
+  accept: z.boolean(),
 });
 
 export const addCommentSchema = z.object({

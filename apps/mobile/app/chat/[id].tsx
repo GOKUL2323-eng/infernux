@@ -12,6 +12,8 @@ import {
   Alert,
   Modal,
   Animated,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,6 +35,8 @@ import { Avatar } from '../../src/components/Avatar';
 import { VoiceMessageBubble } from '../../src/components/VoiceMessageBubble';
 import { RoomDetailsModal } from '../../src/components/RoomDetailsModal';
 import { PrivateMediaViewerModal } from '../../src/components/chat/PrivateMediaViewerModal';
+import { InteractiveMessageCard } from '../../src/components/chat/InteractiveMessageCard';
+import { InteractiveComposerModal } from '../../src/components/chat/InteractiveComposerModal';
 import {
   AnimatedMessageBubble,
   hasMessageAnimated,
@@ -43,10 +47,16 @@ import {
   AnimatedReactionButton,
 } from '../../src/components/chat/AnimatedReactionBadge';
 import { socketClient } from '../../src/socket/socketClient';
+import { api } from '../../src/api/client';
 import { uploadMediaAsset, sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { useNativeDriver } from '../../src/utils/animationHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
-import { MessageSummary } from '@infernux/shared';
+import {
+  AiSmartReplyResponse,
+  AiSummaryResponse,
+  DisappearingMode,
+  MessageSummary,
+} from '@infernux/shared';
 
 const QUICK_REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '😢'];
 
@@ -59,10 +69,25 @@ export default function ChatScreen() {
   const {
     conversations,
     messages,
+    scheduledMessages,
     loadMessages,
+    loadScheduledMessages,
+    cancelScheduledMessage,
     sendMessage,
+    editMessage,
     deleteMessage,
     addReaction,
+    pinMessage,
+    forwardMessage,
+    interactMessage,
+    addSecretReaction,
+    revealSecretReaction,
+    translateMessage,
+    transcribeMessage,
+    savePersonalMessage,
+    createReminder,
+    loadDraft,
+    syncDraft,
     setActiveConversation,
     typingUsers,
     destroyedRoomAlert,
@@ -76,6 +101,11 @@ export default function ChatScreen() {
   const { initiateCall } = useCallStore();
 
   const [inputText, setInputText] = useState('');
+  const [editingMessage, setEditingMessage] = useState<MessageSummary | null>(null);
+  const [disappearingMode, setDisappearingMode] = useState<DisappearingMode>('off');
+  const [isComposerToolsVisible, setIsComposerToolsVisible] = useState(false);
+  const [forwardSourceMessage, setForwardSourceMessage] = useState<MessageSummary | null>(null);
+  const draftTimerRef = useRef<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<any>(null);
@@ -88,11 +118,52 @@ export default function ChatScreen() {
   const [isRoomDetailsVisible, setIsRoomDetailsVisible] = useState(false);
   const [isViewOnceMode, setIsViewOnceMode] = useState(false);
   const [viewingMediaMessage, setViewingMediaMessage] = useState<MessageSummary | null>(null);
+  const [aiSummary, setAiSummary] = useState<AiSummaryResponse | null>(null);
+  const [aiSummaryVisible, setAiSummaryVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [smartReplies, setSmartReplies] = useState<string[]>([]);
+  const [loadingSmartReplies, setLoadingSmartReplies] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  const handleOpenAiSummary = async () => {
+    setAiSummaryVisible(true);
+    setAiLoading(true);
+    try {
+      const res = await api.post<AiSummaryResponse>('/ai/summarize', {
+        conversationId,
+      });
+      setAiSummary(res.data || null);
+    } catch (error: any) {
+      Alert.alert('AI Summary', error.message || 'Unable to summarize conversation');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleFetchSmartReplies = async () => {
+    if (smartReplies.length > 0) {
+      setSmartReplies([]);
+      return;
+    }
+    setLoadingSmartReplies(true);
+    try {
+      const res = await api.post<AiSmartReplyResponse>('/ai/replies', {
+        conversationId,
+        draftContext: inputText.trim() || undefined,
+      });
+      setSmartReplies(res.data?.suggestions || []);
+    } catch (error: any) {
+      Alert.alert('Smart Replies', error.message || 'Unable to generate smart replies');
+    } finally {
+      setLoadingSmartReplies(false);
+    }
+  };
 
   const conversationId = id as string;
   const currentConversation = conversations.find((c) => c.id === conversationId);
   const conversationMessages = messages[conversationId] || [];
+  const pendingScheduled = scheduledMessages[conversationId] || [];
+  const pinnedMessage = [...conversationMessages].reverse().find((m) => m.isPinned && !m.isDeleted);
   const currentTyping = typingUsers[conversationId] || [];
   const isRoom = currentConversation?.type === 'room' || currentConversation?.type === 'group';
   const otherParticipant = currentConversation?.participants.find((p) => p.id !== user?.id);
@@ -101,8 +172,13 @@ export default function ChatScreen() {
     if (conversationId) {
       setActiveConversation(conversationId);
       loadMessages(conversationId);
+      loadScheduledMessages(conversationId);
+      loadDraft(conversationId).then((draft) => {
+        if (draft) setInputText(draft);
+      });
     }
     return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       setActiveConversation(null);
     };
   }, [conversationId]);
@@ -150,14 +226,29 @@ export default function ChatScreen() {
   const handleSendText = async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+
+    if (editingMessage) {
+      const targetId = editingMessage.id;
+      setEditingMessage(null);
+      setInputText('');
+      await editMessage(targetId, conversationId, text);
+      return;
+    }
+
+    const replyId = replyingTo?.id;
     setInputText('');
     setReplyingTo(null);
     socketClient.stopTyping(conversationId);
-
-    const prefix = replyingTo
-      ? `Replying to @${replyingTo.sender.username}: `
-      : '';
-    await sendMessage(conversationId, `${prefix}${text}`, 'text');
+    await sendMessage(
+      conversationId,
+      text,
+      'text',
+      [],
+      false,
+      disappearingMode,
+      replyId ? { replyToId: replyId } : undefined
+    );
   };
 
   const handlePickMedia = async () => {
@@ -398,8 +489,32 @@ export default function ChatScreen() {
                   </Text>
                 )}
 
+                {item.forwardedFrom && (
+                  <Text style={{ fontSize: 10.5, fontStyle: 'italic', color: isSender ? 'rgba(255,255,255,0.8)' : colors.textMuted, marginBottom: 3 }}>
+                    ↪ Forwarded from {item.forwardedFrom.senderDisplayName}
+                  </Text>
+                )}
+
+                {item.replyTo && (
+                  <View style={{ borderLeftWidth: 2, borderLeftColor: '#F04BBE', paddingLeft: 7, marginBottom: 5 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#F04BBE' }}>
+                      {item.replyTo.senderDisplayName}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: isSender ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>
+                      {item.replyTo.content}
+                    </Text>
+                  </View>
+                )}
+
             {/* 1. Shared Reel Card */}
-            {isSharedReel ? (
+            {item.interactiveData ? (
+              <InteractiveMessageCard
+                data={item.interactiveData}
+                currentUserId={user?.id}
+                isSender={isSender}
+                onInteract={(payload) => interactMessage(item.id, conversationId, payload)}
+              />
+            ) : isSharedReel ? (
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.sharedReelCard}
@@ -517,6 +632,38 @@ export default function ChatScreen() {
               </Text>
             )}
 
+            {item.translations && Object.keys(item.translations).length > 0 && (
+              <Text style={{ fontSize: 12, fontStyle: 'italic', marginTop: 4, color: isSender ? 'rgba(255,255,255,0.85)' : colors.primaryLight }}>
+                Translated: {Object.values(item.translations)[0]}
+              </Text>
+            )}
+
+            {item.voiceTranscript && (
+              <Text style={{ fontSize: 11.5, marginTop: 4, color: isSender ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>
+                {item.voiceTranscript.status === 'available'
+                  ? `Transcript: ${item.voiceTranscript.text}`
+                  : item.voiceTranscript.note}
+              </Text>
+            )}
+
+            {item.secretReactions && item.secretReactions.length > 0 && (
+              <TouchableOpacity
+                onPress={() => revealSecretReaction(item.id, conversationId)}
+                style={{
+                  marginTop: 4,
+                  alignSelf: 'flex-start',
+                  backgroundColor: 'rgba(240,75,190,0.2)',
+                  borderRadius: 10,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: '#F9A8D4', fontWeight: '700' }}>
+                  {item.secretReactions.map((sr) => (sr.isRevealed ? sr.emoji : '🔒 Tap to reveal')).join(' ')}
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {/* Reactions badge under message bubble with spring animations */}
             {item.reactions && item.reactions.length > 0 && (
               <AnimatedReactionBadge
@@ -526,8 +673,16 @@ export default function ChatScreen() {
               />
             )}
 
-            {/* Message Footer: Timestamp, Disappearing Timer, Saved Indicator & Read Receipts */}
+            {/* Message Footer: Timestamp, Pin, Disappearing Timer, Saved Indicator & Read Receipts */}
             <View style={styles.msgFooter}>
+              {item.isEdited && (
+                <Text style={{ fontSize: 9.5, color: isSender ? 'rgba(255,255,255,0.7)' : colors.textMuted, marginRight: 4 }}>
+                  Edited
+                </Text>
+              )}
+              {item.isPinned && (
+                <Ionicons name="pin" size={11} color="#F59E0B" style={{ marginRight: 3 }} />
+              )}
               {item.disappearingMode && item.disappearingMode !== 'off' && (
                 <Ionicons
                   name="hourglass-outline"
@@ -629,6 +784,14 @@ export default function ChatScreen() {
 
         {/* Action icons */}
         <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            onPress={handleOpenAiSummary}
+            style={styles.headerIconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+          >
+            <Ionicons name="sparkles-outline" size={21} color={colors.primaryLight} />
+          </TouchableOpacity>
+
           {isRoom && (
             <TouchableOpacity
               onPress={() => setIsRoomDetailsVisible(true)}
@@ -676,6 +839,55 @@ export default function ChatScreen() {
           </View>
         )}
 
+      {/* Pinned & Scheduled Queue Banners */}
+      {pinnedMessage && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: 7,
+            backgroundColor: colors.surfaceElevated,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Ionicons name="pin" size={14} color="#F59E0B" style={{ marginRight: 6 }} />
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: colors.text }}>
+            {pinnedMessage.content}
+          </Text>
+          <TouchableOpacity onPress={() => pinMessage(pinnedMessage.id, conversationId, false)}>
+            <Ionicons name="close" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {pendingScheduled.length > 0 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: 6,
+            backgroundColor: 'rgba(160,32,240,0.14)',
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Ionicons name="time-outline" size={14} color={colors.primaryLight} style={{ marginRight: 6 }} />
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: colors.primaryLight, fontWeight: '700' }}>
+            {pendingScheduled.length} scheduled message(s) • Next:{' '}
+            {new Date(pendingScheduled[0].scheduledFor || Date.now()).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+          <TouchableOpacity onPress={() => cancelScheduledMessage(pendingScheduled[0].id, conversationId)}>
+            <Text style={{ color: colors.error, fontSize: 11.5, fontWeight: '700' }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* 2. Messages Feed & Composer inside KeyboardAvoidingView */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -701,20 +913,83 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {/* Reply Banner Preview */}
-        {replyingTo && (
+        {/* Reply / Edit Banner Preview */}
+        {(replyingTo || editingMessage) && (
           <View style={[styles.replyBanner, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.replyUsername, { color: colors.primary }]}>
-                Replying to @{replyingTo.sender.username}
+                {editingMessage ? 'Editing Message' : `Replying to @${replyingTo?.sender.username}`}
               </Text>
               <Text numberOfLines={1} style={[styles.replyPreview, { color: colors.textSecondary }]}>
-                {replyingTo.content}
+                {editingMessage ? editingMessage.content : replyingTo?.content}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              onPress={() => {
+                setReplyingTo(null);
+                setEditingMessage(null);
+                if (editingMessage) setInputText('');
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="close" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* AI Smart Reply Suggestions Strip */}
+        {!isRecording && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 6,
+              backgroundColor: colors.surface,
+              borderTopWidth: 0.5,
+              borderTopColor: colors.border,
+            }}
+          >
+            <TouchableOpacity
+              onPress={handleFetchSmartReplies}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: borderRadius.full,
+                backgroundColor: 'rgba(160,32,240,0.16)',
+                borderWidth: 1,
+                borderColor: colors.primary,
+                marginRight: 8,
+              }}
+            >
+              <Ionicons name="sparkles" size={12} color={colors.primaryLight} />
+              <Text style={{ color: colors.primaryLight, fontSize: 11.5, fontWeight: '700', marginLeft: 4 }}>
+                {loadingSmartReplies ? 'Thinking...' : smartReplies.length ? 'Hide' : 'Smart Replies'}
+              </Text>
+            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {smartReplies.map((reply, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => {
+                    setInputText(reply);
+                    setSmartReplies([]);
+                  }}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: borderRadius.full,
+                    backgroundColor: colors.surfaceElevated,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontSize: 12 }}>{reply}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -729,6 +1004,21 @@ export default function ChatScreen() {
             },
           ]}
         >
+          {/* Interactive Tools / Scheduling / Disappearing Timer (+) Button */}
+          {!isRecording && (
+            <TouchableOpacity
+              onPress={() => setIsComposerToolsVisible(true)}
+              style={styles.composerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name="add-circle-outline"
+                size={24}
+                color={disappearingMode !== 'off' ? '#F04BBE' : colors.primaryLight}
+              />
+            </TouchableOpacity>
+          )}
+
           {/* Camera / Image Attachment Button */}
           {!isRecording && (
             <TouchableOpacity
@@ -808,6 +1098,10 @@ export default function ChatScreen() {
                   setInputText(text);
                   if (text.length > 0) socketClient.startTyping(conversationId);
                   else socketClient.stopTyping(conversationId);
+                  if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+                  draftTimerRef.current = setTimeout(() => {
+                    syncDraft(conversationId, text);
+                  }, 600);
                 }}
                 style={[styles.textInputField, { color: colors.text }]}
               />
@@ -887,6 +1181,115 @@ export default function ChatScreen() {
                 <Text style={[styles.sheetActionText, { color: colors.text }]}>Reply</Text>
               </TouchableOpacity>
 
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={async () => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  await pinMessage(target.id, conversationId, !target.isPinned);
+                }}
+              >
+                <Ionicons name="pin-outline" size={20} color="#F59E0B" />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>
+                  {selectedMessage.isPinned ? 'Unpin Message' : 'Pin Message'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={() => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  setForwardSourceMessage(target);
+                }}
+              >
+                <Ionicons name="arrow-redo-outline" size={20} color={colors.text} />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>Forward Message</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={async () => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  await addSecretReaction(target.id, conversationId, '🔥');
+                }}
+              >
+                <Ionicons name="lock-closed-outline" size={20} color="#F04BBE" />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>
+                  Send Secret Reaction (🔥)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={async () => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  const res = await translateMessage(target.id, conversationId, 'es');
+                  if (res?.note) Alert.alert('Translation Note', res.note);
+                }}
+              >
+                <Ionicons name="language-outline" size={20} color={colors.primaryLight} />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>Translate (Spanish)</Text>
+              </TouchableOpacity>
+
+              {selectedMessage.contentType === 'audio' && (
+                <TouchableOpacity
+                  style={styles.sheetActionItem}
+                  onPress={async () => {
+                    const target = selectedMessage;
+                    setSelectedMessage(null);
+                    const res = await transcribeMessage(target.id, conversationId);
+                    if (res?.note) Alert.alert('Voice Transcription', res.note);
+                  }}
+                >
+                  <Ionicons name="document-text-outline" size={20} color="#38BDF8" />
+                  <Text style={[styles.sheetActionText, { color: colors.text }]}>Voice-to-Text</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={async () => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  await savePersonalMessage(target.id, 'Important', true);
+                  Alert.alert('Saved', 'Added to your Important Saved Collection');
+                }}
+              >
+                <Ionicons name="bookmark-outline" size={20} color={colors.primaryLight} />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>Save to Important</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={async () => {
+                  const target = selectedMessage;
+                  setSelectedMessage(null);
+                  const inOneHour = new Date(Date.now() + 3600 * 1000).toISOString();
+                  await createReminder(target.id, inOneHour, 'Follow up');
+                  Alert.alert('Reminder Set', 'You will be reminded about this message in 1 hour.');
+                }}
+              >
+                <Ionicons name="alarm-outline" size={20} color="#38BDF8" />
+                <Text style={[styles.sheetActionText, { color: colors.text }]}>Remind Me (+1h)</Text>
+              </TouchableOpacity>
+
+              {selectedMessage.senderId === user?.id && selectedMessage.contentType === 'text' && (
+                <TouchableOpacity
+                  style={styles.sheetActionItem}
+                  onPress={() => {
+                    setEditingMessage(selectedMessage);
+                    setInputText(selectedMessage.content);
+                    setSelectedMessage(null);
+                  }}
+                >
+                  <Ionicons name="create-outline" size={20} color={colors.text} />
+                  <Text style={[styles.sheetActionText, { color: colors.text }]}>Edit Message</Text>
+                </TouchableOpacity>
+              )}
+
               {selectedMessage.senderId === user?.id && (
                 <TouchableOpacity style={styles.sheetActionItem} onPress={handleDeleteSelectedMessage}>
                   <Ionicons name="trash-outline" size={20} color={colors.error} />
@@ -928,6 +1331,158 @@ export default function ChatScreen() {
           }}
         />
       )}
+      {/* Interactive Tools & Scheduling Modal */}
+      <InteractiveComposerModal
+        visible={isComposerToolsVisible}
+        onClose={() => setIsComposerToolsVisible(false)}
+        assigneeOptions={
+          currentConversation?.participants.map((p) => ({
+            id: p.id,
+            displayName: p.displayName || p.username,
+          })) || []
+        }
+        disappearingMode={disappearingMode}
+        onSelectDisappearingMode={setDisappearingMode}
+        onSendInteractive={(contentType, content, interactiveData) => {
+          sendMessage(conversationId, content, contentType, [], false, disappearingMode, {
+            interactiveData,
+          });
+        }}
+        onScheduleMessage={(content, scheduledFor) => {
+          sendMessage(conversationId, content, 'text', [], false, disappearingMode, {
+            scheduledFor,
+          });
+        }}
+      />
+
+      {/* Forward Message Conversation Picker Modal */}
+      {forwardSourceMessage && (
+        <Modal
+          visible={Boolean(forwardSourceMessage)}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setForwardSourceMessage(null)}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setForwardSourceMessage(null)}
+          >
+            <View style={[styles.actionSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 10 }}>
+                Forward Message To...
+              </Text>
+              {conversations
+                .filter((c) => c.id !== conversationId)
+                .slice(0, 8)
+                .map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={styles.sheetActionItem}
+                    onPress={async () => {
+                      const src = forwardSourceMessage;
+                      setForwardSourceMessage(null);
+                      await forwardMessage(src.id, [c.id]);
+                      Alert.alert('Forwarded', `Message sent to ${c.title || 'conversation'}`);
+                    }}
+                  >
+                    <Ionicons name="paper-plane-outline" size={18} color={colors.primaryLight} />
+                    <Text style={[styles.sheetActionText, { color: colors.text }]}>
+                      {c.title || 'Conversation'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+      {/* AI Conversation Summary Modal */}
+      <Modal
+        visible={aiSummaryVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAiSummaryVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setAiSummaryVisible(false)}
+        >
+          <View
+            style={[
+              styles.actionSheet,
+              { backgroundColor: colors.surface, borderColor: colors.border, maxHeight: '75%' },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="sparkles" size={18} color={colors.primaryLight} />
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginLeft: 6 }}>
+                  AI Thread Summary
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setAiSummaryVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {aiLoading ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : aiSummary ? (
+              <ScrollView>
+                <Text style={{ color: colors.text, fontSize: 13.5, lineHeight: 20 }}>
+                  {aiSummary.summary}
+                </Text>
+                {aiSummary.keyTopics.length > 0 && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                    {aiSummary.keyTopics.map((topic) => (
+                      <View
+                        key={topic}
+                        style={{
+                          paddingHorizontal: 9,
+                          paddingVertical: 4,
+                          borderRadius: borderRadius.full,
+                          backgroundColor: 'rgba(160,32,240,0.16)',
+                        }}
+                      >
+                        <Text style={{ color: colors.primaryLight, fontSize: 11.5, fontWeight: '700' }}>
+                          #{topic}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {aiSummary.extractedTasks.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>
+                      EXTRACTED TASKS
+                    </Text>
+                    {aiSummary.extractedTasks.map((task, idx) => (
+                      <Text key={idx} style={{ color: colors.text, fontSize: 12.5, marginBottom: 3 }}>
+                        • {task}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+                {aiSummary.extractedDates.length > 0 && (
+                  <View style={{ marginTop: 10 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>
+                      MENTIONED DATES / TIMES
+                    </Text>
+                    <Text style={{ color: colors.primaryLight, fontSize: 12.5 }}>
+                      {aiSummary.extractedDates.join(' • ')}
+                    </Text>
+                  </View>
+                )}
+                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 12 }}>
+                  {aiSummary.disclaimer}
+                </Text>
+              </ScrollView>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

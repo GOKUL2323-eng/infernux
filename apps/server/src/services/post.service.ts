@@ -26,6 +26,10 @@ export class PostService {
       }
     }
 
+    const collabInvites = (input.collaboratorIds || [])
+      .filter((id) => id !== authorId)
+      .map((id) => ({ userId: new mongoose.Types.ObjectId(id), status: 'pending' as const }));
+
     const post = new Post({
       authorId,
       caption: input.caption || '',
@@ -33,6 +37,8 @@ export class PostService {
       hashtags,
       mentions: input.mentions || [],
       isPrivate: input.isPrivate || false,
+      collaboratorIds: [],
+      collabInvites,
     });
     await post.save();
 
@@ -60,6 +66,11 @@ export class PostService {
       isLiked: false,
       isSaved: false,
       isPrivate: post.isPrivate,
+      collaborators: [],
+      collabInvites: collabInvites.map((ci) => ({
+        userId: ci.userId.toString(),
+        status: ci.status,
+      })),
       createdAt: post.createdAt.toISOString(),
       updatedAt: post.updatedAt.toISOString(),
     };
@@ -86,12 +97,13 @@ export class PostService {
     });
     const followingIds = follows.map((f) => f.followingId);
 
-    // Feed includes self, followed users, and permitted public posts
+    // Feed includes self, followed users, and collaborative posts accepted by them
+    const visibleOwners = [new mongoose.Types.ObjectId(userId), ...followingIds];
     const query: any = {
-      authorId: {
-        $nin: blockedUserIds,
-        $in: [new mongoose.Types.ObjectId(userId), ...followingIds],
-      },
+      $or: [
+        { authorId: { $nin: blockedUserIds, $in: visibleOwners } },
+        { collaboratorIds: { $in: visibleOwners }, authorId: { $nin: blockedUserIds } },
+      ],
     };
 
     if (beforeCursor) {
@@ -103,6 +115,7 @@ export class PostService {
 
     const posts = await Post.find(query)
       .populate('authorId', 'username displayName avatarUrl isVerified')
+      .populate('collaboratorIds', 'username displayName avatarUrl isVerified')
       .sort(feedType === 'personalized' ? { likesCount: -1, createdAt: -1 } : { createdAt: -1 })
       .limit(limit + 1);
 
@@ -149,6 +162,19 @@ export class PostService {
         isLiked: likedSet.has(pid),
         isSaved: savedSet.has(pid),
         isPrivate: p.isPrivate,
+        collaborators: ((p.collaboratorIds || []) as any[])
+          .filter((c) => c && c.username)
+          .map((c) => ({
+            id: c._id.toString(),
+            username: c.username,
+            displayName: c.displayName,
+            avatarUrl: c.avatarUrl,
+            isVerified: c.isVerified,
+          })),
+        collabInvites: (p.collabInvites || []).map((ci: any) => ({
+          userId: ci.userId.toString(),
+          status: ci.status,
+        })),
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       };
@@ -311,6 +337,25 @@ export class PostService {
     await Like.deleteMany({ targetType: 'post', targetId: postId });
     await SavedItem.deleteMany({ itemType: 'post', itemId: postId });
     await User.findByIdAndUpdate(userId, { $inc: { postsCount: -1 } });
+  }
+
+  async respondCollabInvite(
+    userId: string,
+    postId: string,
+    accept: boolean
+  ): Promise<{ accepted: boolean }> {
+    const post = await Post.findById(postId);
+    if (!post) throw new Error('Post not found');
+
+    const invite = (post.collabInvites || []).find((i) => i.userId.toString() === userId);
+    if (!invite) throw new Error('Collaboration invite not found');
+
+    invite.status = accept ? 'accepted' : 'declined';
+    if (accept && !post.collaboratorIds.some((id) => id.toString() === userId)) {
+      post.collaboratorIds.push(new mongoose.Types.ObjectId(userId));
+    }
+    await post.save();
+    return { accepted: accept };
   }
 }
 

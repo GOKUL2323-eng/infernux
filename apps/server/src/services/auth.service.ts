@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { config } from '../config/env';
 import { User, IUserDocument } from '../models/User';
 import { Session } from '../models/Session';
+import { LoginActivity } from '../models/LoginActivity';
 import { hashToken } from '../utils/crypto';
 import { smsService } from './sms.service';
 import {
@@ -108,6 +109,13 @@ export class AuthService {
 
     const isValidPassword = await bcrypt.compare(input.password, user.passwordHash);
     if (!isValidPassword) {
+      await LoginActivity.create({
+        userId: user._id,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        reason: 'Invalid credentials',
+      }).catch(() => undefined);
       throw new Error('Invalid credentials');
     }
 
@@ -123,6 +131,13 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
     await session.save();
+
+    await LoginActivity.create({
+      userId: user._id,
+      ipAddress,
+      userAgent,
+      status: 'success',
+    }).catch(() => undefined);
 
     return {
       user: user.toProfileJSON(),

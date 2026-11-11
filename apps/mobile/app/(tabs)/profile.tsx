@@ -24,14 +24,22 @@ import { CommentsModal } from '../../src/components/CommentsModal';
 import { api } from '../../src/api/client';
 import { sanitizeMediaUrl } from '../../src/utils/uploadHelper';
 import { spacing, borderRadius, typography } from '../../src/theme/spacing';
-import { PostSummary, ReelSummary } from '@infernux/shared';
+import { PostSummary, ReelSummary, StoryHighlightSummary, PresenceStatusMode, UserProfile } from '@infernux/shared';
 
 type ProfileTab = 'posts' | 'reels' | 'saved';
+
+const PRESENCE_MODES: { mode: PresenceStatusMode; label: string; icon: string }[] = [
+  { mode: 'online', label: 'Online', icon: 'radio-button-on' },
+  { mode: 'focus', label: 'Focus', icon: 'moon' },
+  { mode: 'listening', label: 'Listening', icon: 'musical-notes' },
+  { mode: 'gaming', label: 'Gaming', icon: 'game-controller' },
+  { mode: 'dnd', label: 'DND', icon: 'notifications-off' },
+];
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { user, logout, deleteAccount } = useAuthStore();
+  const { user, logout, deleteAccount, updateUser } = useAuthStore();
   const { colors } = useThemeStore();
 
   const GRID_SPACING = 4;
@@ -40,7 +48,19 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('posts');
   const [userPosts, setUserPosts] = useState<PostSummary[]>([]);
   const [userReels, setUserReels] = useState<ReelSummary[]>([]);
+  const [highlights, setHighlights] = useState<StoryHighlightSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleSelectPresence = async (mode: PresenceStatusMode) => {
+    const res = await api.put<UserProfile>('/experiences/presence', {
+      statusMode: mode,
+      customStatusText: mode === 'focus' ? 'In Focus Mode' : undefined,
+      focusDurationMinutes: mode === 'focus' ? 45 : 0,
+    });
+    if (res.success && res.data) {
+      updateUser(res.data);
+    }
+  };
 
   // Modals
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
@@ -91,13 +111,15 @@ export default function ProfileScreen() {
 
   const fetchUserContent = async () => {
     if (!user) return;
-    const [postsRes, reelsRes] = await Promise.all([
+    const [postsRes, reelsRes, hlRes] = await Promise.all([
       api.get<PostSummary[]>(`/posts/user/${user.id}`),
       api.get<ReelSummary[]>(`/reels/user/${user.id}`),
+      api.get<StoryHighlightSummary[]>(`/stories/highlights/${user.id}`),
     ]);
 
     if (postsRes.success && postsRes.data) setUserPosts(postsRes.data);
     if (reelsRes.success && reelsRes.data) setUserReels(reelsRes.data);
+    if (hlRes.success && hlRes.data) setHighlights(hlRes.data);
   };
 
   const onRefresh = async () => {
@@ -255,6 +277,36 @@ export default function ProfileScreen() {
               {user.bio}
             </Text>
           ) : null}
+          {user?.featuredSongTitle ? (
+            <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '700', marginTop: 4 }}>
+              ♪ {user.featuredSongTitle}
+            </Text>
+          ) : null}
+
+          {/* Smart Presence Strip */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            {PRESENCE_MODES.map((p) => {
+              const active = (user?.statusMode || 'online') === p.mode;
+              return (
+                <TouchableOpacity
+                  key={p.mode}
+                  onPress={() => handleSelectPresence(p.mode)}
+                  style={[
+                    styles.presencePill,
+                    {
+                      backgroundColor: active ? colors.primary : colors.card,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons name={p.icon as any} size={12} color={active ? '#FFFFFF' : colors.accent} />
+                  <Text style={{ color: active ? '#FFFFFF' : colors.textSecondary, fontSize: 11, fontWeight: '700' }}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* 5. Action Buttons */}
@@ -292,6 +344,32 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            onPress={() => router.push('/creator' as any)}
+            style={[
+              styles.discoverBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="analytics-outline" size={16} color={colors.accent} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/snap' as any)}
+            style={[
+              styles.discoverBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="flash-outline" size={16} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             onPress={() => router.push('/search' as any)}
             style={[
               styles.discoverBtn,
@@ -304,6 +382,71 @@ export default function ProfileScreen() {
             <Ionicons name="person-add-outline" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
+
+        {/* Experience & Community Hub Row */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.highlightsRow}
+        >
+          {[
+            { label: 'Capsules', icon: 'hourglass-outline', route: '/capsules' },
+            { label: 'MoodSpace', icon: 'happy-outline', route: '/moodspace' },
+            { label: 'Spaces & Audio', icon: 'planet-outline', route: '/communities' },
+            { label: 'Files & Quota', icon: 'folder-open-outline', route: '/files' },
+            { label: 'Creator Studio', icon: 'analytics-outline', route: '/creator' },
+          ].map((hub) => (
+            <TouchableOpacity
+              key={hub.route}
+              onPress={() => router.push(hub.route as any)}
+              style={[styles.hubChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <Ionicons name={hub.icon as any} size={14} color={colors.accent} />
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>{hub.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Story Highlights Row */}
+        {highlights.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.highlightsRow}
+          >
+            {highlights.map((hl) => (
+              <TouchableOpacity
+                key={hl.id}
+                onPress={() => router.push(`/story/${user?.id}` as any)}
+                onLongPress={() => {
+                  Alert.alert('Delete Highlight', `Remove "${hl.title}"?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await api.delete(`/stories/highlights/${hl.id}`);
+                        fetchUserContent();
+                      },
+                    },
+                  ]);
+                }}
+                style={styles.highlightItem}
+              >
+                <View style={[styles.highlightRing, { borderColor: colors.primary, backgroundColor: colors.card }]}>
+                  {hl.coverUrl ? (
+                    <Image source={{ uri: sanitizeMediaUrl(hl.coverUrl) }} style={styles.highlightCover} />
+                  ) : (
+                    <Ionicons name="sparkles" size={20} color={colors.accent} />
+                  )}
+                </View>
+                <Text numberOfLines={1} style={[typography.caption, { color: colors.text, marginTop: 4, maxWidth: 64 }]}>
+                  {hl.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {/* 6. Content Segmented Tabs */}
         <View style={[styles.tabIconsRow, { borderBottomColor: colors.border }]}>
@@ -705,6 +848,46 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+  },
+  highlightsRow: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: 14,
+  },
+  highlightItem: {
+    alignItems: 'center',
+  },
+  highlightRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  highlightCover: {
+    width: '100%',
+    height: '100%',
+  },
+  presencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  hubChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
   },
 });

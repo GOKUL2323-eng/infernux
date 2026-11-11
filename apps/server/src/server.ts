@@ -6,6 +6,7 @@ import { connectDatabase, disconnectDatabase } from './config/database';
 import { initializeSocketIO } from './sockets';
 import { startStoryCleanupJob } from './jobs/story-cleanup.job';
 import { startPrivateRoomCleanupJob } from './jobs/private-room-cleanup.job';
+import { startMessagingJobs } from './jobs/scheduled-message.job';
 import { logger } from './utils/logger';
 
 async function bootstrap() {
@@ -29,6 +30,7 @@ async function bootstrap() {
   // Start background jobs
   const cleanupTimer = startStoryCleanupJob(15);
   const privateCleanupTimer = startPrivateRoomCleanupJob(30);
+  const messagingJobsTimer = startMessagingJobs(15);
 
   // Start listening
   server.listen(config.port, config.host, () => {
@@ -43,6 +45,7 @@ async function bootstrap() {
     logger.info(`Received ${signal}. Shutting down gracefully...`, 'Bootstrap');
     clearInterval(cleanupTimer);
     clearInterval(privateCleanupTimer);
+    clearInterval(messagingJobsTimer);
     io.close();
     server.close(async () => {
       await disconnectDatabase();

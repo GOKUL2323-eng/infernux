@@ -1,5 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { UserProfile, UserPrivacySettings, NotificationPreferences } from '@infernux/shared';
+import {
+  UserProfile,
+  UserPrivacySettings,
+  NotificationPreferences,
+  PresenceStatusMode,
+  AccountRole,
+  ProfilePromptItem,
+  GuestbookEntry,
+} from '@infernux/shared';
 
 export interface IUserDocument extends Document {
   username: string;
@@ -18,6 +26,16 @@ export interface IUserDocument extends Document {
   isVerified: boolean;
   isOnline: boolean;
   lastSeen: Date;
+  role: AccountRole;
+  isSuspended: boolean;
+  suspendedReason?: string;
+  statusMode: PresenceStatusMode;
+  customStatusText?: string;
+  focusModeUntil?: Date;
+  profileThemeAccent?: string;
+  featuredSongTitle?: string;
+  profilePrompts?: ProfilePromptItem[];
+  guestbookEntries?: GuestbookEntry[];
   privacy: UserPrivacySettings;
   notifications: NotificationPreferences;
   pushTokens: string[];
@@ -25,6 +43,7 @@ export interface IUserDocument extends Document {
   followingCount: number;
   postsCount: number;
   reelsCount: number;
+  closeFriends: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
   toProfileJSON(): UserProfile;
@@ -143,10 +162,25 @@ const UserSchema = new Schema<IUserDocument>(
       default: () => ({}),
     },
     pushTokens: [{ type: String }],
+    role: { type: String, enum: ['user', 'moderator', 'admin'], default: 'user', index: true },
+    isSuspended: { type: Boolean, default: false, index: true },
+    suspendedReason: { type: String },
+    statusMode: {
+      type: String,
+      enum: ['online', 'focus', 'gaming', 'listening', 'away', 'busy', 'dnd'],
+      default: 'online',
+    },
+    customStatusText: { type: String, maxlength: 80 },
+    focusModeUntil: { type: Date },
+    profileThemeAccent: { type: String, default: '#A020F0' },
+    featuredSongTitle: { type: String, maxlength: 120 },
+    profilePrompts: { type: Schema.Types.Mixed, default: [] },
+    guestbookEntries: { type: Schema.Types.Mixed, default: [] },
     followersCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
     postsCount: { type: Number, default: 0 },
     reelsCount: { type: Number, default: 0 },
+    closeFriends: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
   {
     timestamps: true,
@@ -171,6 +205,16 @@ UserSchema.methods.toProfileJSON = function (): UserProfile {
     isVerified: this.isVerified,
     isOnline: this.privacy.showActivityStatus ? this.isOnline : undefined,
     lastSeen: this.privacy.showLastSeen ? this.lastSeen.toISOString() : undefined,
+    role: this.role || 'user',
+    isSuspended: this.isSuspended || false,
+    suspendedReason: this.suspendedReason,
+    statusMode: this.statusMode || 'online',
+    customStatusText: this.customStatusText,
+    focusModeUntil: this.focusModeUntil ? this.focusModeUntil.toISOString() : undefined,
+    profileThemeAccent: this.profileThemeAccent,
+    featuredSongTitle: this.featuredSongTitle,
+    profilePrompts: this.profilePrompts || [],
+    guestbookEntries: this.guestbookEntries || [],
     followersCount: this.followersCount,
     followingCount: this.followingCount,
     postsCount: this.postsCount,
