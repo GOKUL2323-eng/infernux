@@ -298,3 +298,4 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
 });
+

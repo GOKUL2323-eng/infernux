@@ -45,3 +45,4 @@ export class AiController {
 }
 
 export const aiController = new AiController();
+

@@ -99,3 +99,4 @@ export interface StorageQuotaSummary {
   filesCount: number;
   percentUsed: number;
 }
+

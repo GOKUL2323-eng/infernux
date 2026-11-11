@@ -32,3 +32,4 @@ export const CommunityChannel = mongoose.model<ICommunityChannelDocument>(
   'CommunityChannel',
   CommunityChannelSchema
 );
+

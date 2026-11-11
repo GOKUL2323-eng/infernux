@@ -53,3 +53,4 @@ export interface TogetherSessionSummary {
   status: 'active' | 'ended';
   createdAt: string;
 }
+

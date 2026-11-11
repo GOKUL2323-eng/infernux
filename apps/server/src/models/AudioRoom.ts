@@ -50,3 +50,4 @@ const AudioRoomSchema = new Schema<IAudioRoomDocument>(
 );
 
 export const AudioRoom = mongoose.model<IAudioRoomDocument>('AudioRoom', AudioRoomSchema);
+

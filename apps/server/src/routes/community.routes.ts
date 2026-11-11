@@ -36,3 +36,4 @@ router.post('/:id/posts/:postId/pin', (req, res, next) =>
 );
 
 export default router;
+

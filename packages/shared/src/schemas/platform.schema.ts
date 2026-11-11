@@ -43,3 +43,4 @@ export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
 export type UpdateAccountRoleInput = z.infer<typeof updateAccountRoleSchema>;
 export type CreateAppealInput = z.infer<typeof createAppealSchema>;
 export type ReviewAppealInput = z.infer<typeof reviewAppealSchema>;
+

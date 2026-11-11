@@ -28,3 +28,4 @@ router.post('/:id/react', validateBody(audioRoomReactionSchema), (req, res, next
 router.post('/:id/end', (req, res, next) => audioRoomController.endRoom(req, res, next));
 
 export default router;
+

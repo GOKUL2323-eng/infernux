@@ -178,3 +178,4 @@ const styles = StyleSheet.create({
   partRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   partChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
 });
+

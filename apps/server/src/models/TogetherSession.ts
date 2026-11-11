@@ -34,3 +34,4 @@ export const TogetherSession = mongoose.model<ITogetherSessionDocument>(
   'TogetherSession',
   TogetherSessionSchema
 );
+

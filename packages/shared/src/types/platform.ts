@@ -69,3 +69,4 @@ export interface SuspensionAppealSummary {
   createdAt: string;
   resolvedAt?: string;
 }
+

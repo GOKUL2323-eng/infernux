@@ -63,3 +63,4 @@ export type SyncTogetherStateInput = z.infer<typeof syncTogetherStateSchema>;
 export type UpdateSmartPresenceInput = z.infer<typeof updateSmartPresenceSchema>;
 export type UpdateInteractiveProfileInput = z.infer<typeof updateInteractiveProfileSchema>;
 export type SignGuestbookInput = z.infer<typeof signGuestbookSchema>;
+

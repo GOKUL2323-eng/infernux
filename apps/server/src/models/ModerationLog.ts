@@ -34,3 +34,4 @@ const ModerationLogSchema = new Schema<IModerationLogDocument>(
 ModerationLogSchema.index({ createdAt: -1 });
 
 export const ModerationLog = mongoose.model<IModerationLogDocument>('ModerationLog', ModerationLogSchema);
+

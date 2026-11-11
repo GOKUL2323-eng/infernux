@@ -36,3 +36,4 @@ export const CommunityPost = mongoose.model<ICommunityPostDocument>(
   'CommunityPost',
   CommunityPostSchema
 );
+

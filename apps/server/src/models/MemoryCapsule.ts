@@ -28,3 +28,4 @@ export const MemoryCapsule = mongoose.model<IMemoryCapsuleDocument>(
   'MemoryCapsule',
   MemoryCapsuleSchema
 );
+

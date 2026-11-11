@@ -279,3 +279,4 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
   sealBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: borderRadius.md },
 });
+

@@ -45,3 +45,4 @@ export const SuspensionAppeal = mongoose.model<ISuspensionAppealDocument>(
   'SuspensionAppeal',
   SuspensionAppealSchema
 );
+

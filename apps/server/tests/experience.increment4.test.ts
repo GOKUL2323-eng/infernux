@@ -189,3 +189,4 @@ describe('Increment 4: Memory Capsules, MoodSpace, Together Mode & Smart Presenc
     expect(gbRes.body.data[0].note).toBe('Cool profile setup!');
   });
 });
+

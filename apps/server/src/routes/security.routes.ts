@@ -17,3 +17,4 @@ router.post('/sessions/:id/revoke', (req, res, next) =>
 );
 
 export default router;
+

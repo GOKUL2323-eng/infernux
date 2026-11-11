@@ -305,3 +305,4 @@ const styles = StyleSheet.create({
   modalCard: { borderRadius: borderRadius.lg, borderWidth: 1, padding: spacing.lg },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, borderWidth: 1 },
 });
+

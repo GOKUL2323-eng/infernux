@@ -34,3 +34,4 @@ const LoginActivitySchema = new Schema<ILoginActivityDocument>(
 LoginActivitySchema.index({ userId: 1, createdAt: -1 });
 
 export const LoginActivity = mongoose.model<ILoginActivityDocument>('LoginActivity', LoginActivitySchema);
+

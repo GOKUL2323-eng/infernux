@@ -43,3 +43,4 @@ const CommunitySchema = new Schema<ICommunityDocument>(
 CommunitySchema.index({ 'members.userId': 1 });
 
 export const Community = mongoose.model<ICommunityDocument>('Community', CommunitySchema);
+

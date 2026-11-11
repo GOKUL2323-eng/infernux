@@ -67,3 +67,4 @@ export type CreateCommunityPostInput = z.infer<typeof createCommunityPostSchema>
 export type AssignCommunityRoleInput = z.infer<typeof assignCommunityRoleSchema>;
 export type CreateAudioRoomInput = z.infer<typeof createAudioRoomSchema>;
 export type RegisterSharedFileInput = z.infer<typeof registerSharedFileSchema>;
+
