@@ -40,6 +40,26 @@ export default function RootLayout() {
     }
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // Suppress non-fatal React Native Web warnings from showing Expo red toasts
+      if (typeof console !== 'undefined') {
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        console.error = (...args: any[]) => {
+          const str = String(args[0] || '');
+          if (str.includes('BackHandler is not supported on web') || str.includes('useNativeDriver is not supported on web')) {
+            return;
+          }
+          originalError.apply(console, args);
+        };
+        console.warn = (...args: any[]) => {
+          const str = String(args[0] || '');
+          if (str.includes('BackHandler is not supported on web') || str.includes('useNativeDriver is not supported on web')) {
+            return;
+          }
+          originalWarn.apply(console, args);
+        };
+      }
+
       const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
         const reason = event?.reason;
         const name = reason?.name || '';

@@ -23,7 +23,7 @@ export function createApp(): Application {
       origin: true, // Dynamically reflect origin so credentialed requests from browser never fail CORS
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'Range', 'Origin'],
     })
   );
 
